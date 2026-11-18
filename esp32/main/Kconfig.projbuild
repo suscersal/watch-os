@@ -1,0 +1,29 @@
+menu "watch-os"
+
+    config WATCH_WIFI_SSID
+        string "Wi-Fi SSID"
+        default ""
+        help
+            Имя сети Wi-Fi (только 2.4 ГГц). Пусто - Wi-Fi не включается.
+            Это временный способ до приложения «Настройки». Сети с входом через
+            страницу авторизации (captive portal, Госуслуги) не поддерживаются.
+
+    config WATCH_WIFI_PASSWORD
+        string "Wi-Fi password"
+        default ""
+
+    config WATCH_BRIGHTNESS
+        int "Яркость экрана, %"
+        default 70
+        range 5 100
+        help
+            После инициализации BSP яркость равна 0, экран чёрный, пока её не задать.
+
+    config WATCH_LVGL_STACK
+        int "Размер стека задачи LVGL, байт"
+        default 16384
+        range 8192 65536
+        help
+            Сетевые запросы (TLS) и разбор JSON выполняются в задаче LVGL, стека по умолчанию мало.
+
+endmenu
