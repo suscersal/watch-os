@@ -1,6 +1,6 @@
 // pinpad.h - цифровая клавиатура для PIN: заголовок, точки, сообщение, кнопки 0-9, стереть и OK.
 #pragma once
-#include "lvgl/lvgl.h"
+#include "lvgl_inc.h"
 #include <stdbool.h>
 
 // Вызывается по нажатию OK (если введено >= 4 цифр) или автоматически, когда введено auto_len цифр.

@@ -1,6 +1,6 @@
 // sys_ui.h - системный UI: тост и клавиатура. Рисуется только ядром, поверх приложений (lv_layer_top).
 #pragma once
-#include "lvgl/lvgl.h"
+#include "lvgl_inc.h"
 
 void sys_ui_init(void);                 // один раз при старте: шрифты системных слоёв
 void sys_toast(const char *text);

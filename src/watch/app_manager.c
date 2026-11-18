@@ -3,7 +3,7 @@
 #include "cJSON.h"
 #include "installer.h"
 #include "security_app.h"
-#include "lvgl/lvgl.h"
+#include "lvgl_inc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

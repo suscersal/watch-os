@@ -2,7 +2,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
-#include "lvgl/lvgl.h"
+#include "lvgl_inc.h"
 
 #define APPS_MAX      32
 #define PERM_NET      (1u << 0)

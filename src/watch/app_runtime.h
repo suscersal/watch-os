@@ -1,6 +1,6 @@
 // app_runtime.h - запуск приложения: разбор app.json, навигация между экранами.
 #pragma once
-#include "lvgl/lvgl.h"
+#include "lvgl_inc.h"
 #include "cJSON.h"
 #include "app_manager.h"
 

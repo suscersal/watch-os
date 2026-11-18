@@ -7,7 +7,7 @@
 //     "app":      { "start": "main", "screens": { ... } } }
 #pragma once
 #include "cJSON.h"
-#include "lvgl/lvgl.h"
+#include "lvgl_inc.h"
 #include <stdbool.h>
 #include <stddef.h>
 

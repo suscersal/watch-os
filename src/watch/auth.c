@@ -3,7 +3,7 @@
 #include "fs.h"
 #include "plat.h"
 #include "sha256.h"
-#include "lvgl/lvgl.h"
+#include "lvgl_inc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

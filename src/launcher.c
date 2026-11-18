@@ -1,12 +1,17 @@
 // launcher.c - сотовая сетка иконок как на Apple Watch. LVGL 9.
 // Список приложений берётся из apps/*/manifest.json (см. watch/app_manager.c).
-#include "lvgl/lvgl.h"
+#include "watch/lvgl_inc.h"
 #include "watch/app_manager.h"
 #include "watch/app_runtime.h"
 #include "watch/auth.h"
 #include "watch/lock_screen.h"
 #include "watch/sys_ui.h"
 #include "watch/watch_fonts.h"
+
+// Корень файлов. ПК: относительно текущей папки. ESP32: "/flash/" (задаётся в CMake порта).
+#ifndef WATCH_ROOT
+#define WATCH_ROOT ""
+#endif
 
 #define SCR_W    410
 #define SCR_H    502
@@ -72,8 +77,8 @@ void watch_launcher_create(void)
     lv_obj_set_style_text_font(launcher, WATCH_FONT_BODY, 0);   // шрифт с кириллицей
 
     sys_ui_init();
-    auth_init("data");          // PIN и настройки безопасности, папка data/ недоступна приложениям
-    app_manager_scan("apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
+    auth_init(WATCH_ROOT "data");          // PIN и настройки безопасности, папка data/ недоступна приложениям
+    app_manager_scan(WATCH_ROOT "apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
     build_grid();
     lock_screen_init();         // если задан PIN, стартуем заблокированными
 }
