@@ -1,0 +1,12 @@
+{
+  "start": "main",
+  "screens": {
+    "main": {
+      "title": "Permission test",
+      "ui": [
+        { "type": "label", "text": "This app has no net permission. The button below must be denied." },
+        { "type": "button", "text": "Try ai.ask", "on_click": [ { "do": "ai.ask", "q": "hi", "out": "answer" } ] }
+      ]
+    }
+  }
+}

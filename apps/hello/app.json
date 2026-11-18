@@ -1,0 +1,20 @@
+{
+  "start": "main",
+  "screens": {
+    "main": {
+      "title": "Hello",
+      "ui": [
+        { "type": "label", "text": "Your name:" },
+        { "type": "input", "var": "name", "placeholder": "Type here" },
+        { "type": "button", "text": "Say hello", "on_click": [ { "do": "goto", "screen": "hi" } ] }
+      ]
+    },
+    "hi": {
+      "title": "Greeting",
+      "ui": [
+        { "type": "label", "text": "Hello, @name!", "size": "large" },
+        { "type": "button", "text": "Done", "color": "#6B7280", "on_click": [ { "do": "back" } ] }
+      ]
+    }
+  }
+}

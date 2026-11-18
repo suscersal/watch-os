@@ -1,0 +1,17 @@
+{
+  "id": "echo",
+  "manifest": { "name": "Echo", "icon": "mail", "color": "#14B8A6", "permissions": ["net"] },
+  "app": {
+    "start": "main",
+    "screens": {
+      "main": {
+        "title": "Echo (needs net)",
+        "ui": [
+          { "type": "input", "var": "q", "placeholder": "Say something" },
+          { "type": "button", "text": "Send", "on_click": [ { "do": "ai.ask", "q": "@q", "out": "answer" } ] },
+          { "type": "label", "text": "@answer" }
+        ]
+      }
+    }
+  }
+}

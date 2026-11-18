@@ -1,0 +1,13 @@
+{
+  "start": "main",
+  "screens": {
+    "main": {
+      "title": "Ask (stub)",
+      "ui": [
+        { "type": "input", "var": "q", "placeholder": "Question" },
+        { "type": "button", "text": "Ask", "on_click": [ { "do": "ai.ask", "q": "@q", "out": "answer" } ] },
+        { "type": "label", "text": "@answer" }
+      ]
+    }
+  }
+}

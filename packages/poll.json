@@ -1,0 +1,21 @@
+{
+  "id": "poll",
+  "manifest": { "name": "Poll", "icon": "ok", "color": "#EC4899", "permissions": [] },
+  "app": {
+    "start": "main",
+    "vars": { "yes": 0, "no": 0 },
+    "screens": {
+      "main": {
+        "title": "Poll",
+        "ui": [
+          { "type": "label", "text": "Do you like it?", "size": "large" },
+          { "type": "row", "children": [
+            { "type": "button", "text": "Yes", "color": "#22C55E", "on_click": [ { "do": "add", "var": "yes" } ] },
+            { "type": "button", "text": "No", "color": "#EF4444", "on_click": [ { "do": "add", "var": "no" } ] }
+          ] },
+          { "type": "label", "text": "Yes: @yes   No: @no" }
+        ]
+      }
+    }
+  }
+}

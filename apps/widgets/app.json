@@ -1,0 +1,15 @@
+{
+  "start": "main",
+  "vars": { "dark": "0" },
+  "screens": {
+    "main": {
+      "title": "Widgets",
+      "ui": [
+        { "type": "switch", "text": "Dark mode", "var": "dark" },
+        { "type": "label", "text": "dark = @dark", "color": "#9CA3AF" },
+        { "type": "spacer", "h": 16 },
+        { "type": "label", "text": "Literal at-sign: user@@mail" }
+      ]
+    }
+  }
+}
