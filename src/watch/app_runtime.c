@@ -1,6 +1,7 @@
 #include "app_runtime.h"
 #include "fs.h"
 #include "sys_ui.h"
+#include "tables.h"
 #include "ui_renderer.h"
 #include "vars.h"
 #include <stdio.h>
@@ -65,6 +66,7 @@ void app_runtime_launch(const app_info_t *a, lv_obj_t *launcher)
     r->depth = 1;
 
     vars_clear();
+    tables_clear();
     load_initial_vars(root);
 
     lv_obj_t *scr = ui_build_screen(r, r->hist[0]);
@@ -107,6 +109,10 @@ void app_nav_back(app_run_t *r)
 void app_refresh_bindings(app_run_t *r)
 {
     for (int i = 0; i < r->nbind; i++) {
+        if (r->binds[i].kind == BIND_BAR) {
+            lv_bar_set_value(r->binds[i].obj, (int32_t)strtod(vars_get(r->binds[i].tmpl), NULL), LV_ANIM_OFF);
+            continue;
+        }
         char buf[BIND_TMPL];
         vars_expand(r->binds[i].tmpl, buf, sizeof buf);
         lv_label_set_text(r->binds[i].obj, buf);

@@ -3,6 +3,7 @@
 #include "watch/lvgl_inc.h"
 #include "watch/app_manager.h"
 #include "watch/app_runtime.h"
+#include "watch/storage.h"
 #include "watch/auth.h"
 #include "watch/lock_screen.h"
 #include "watch/sys_ui.h"
@@ -77,7 +78,8 @@ void watch_launcher_create(void)
     lv_obj_set_style_text_font(launcher, WATCH_FONT_BODY, 0);   // шрифт с кириллицей
 
     sys_ui_init();
-    auth_init(WATCH_ROOT "data");          // PIN и настройки безопасности, папка data/ недоступна приложениям
+    auth_init(WATCH_ROOT "data");
+    storage_init(WATCH_ROOT "data");          // PIN и настройки безопасности, папка data/ недоступна приложениям
     app_manager_scan(WATCH_ROOT "apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
     build_grid();
     lock_screen_init();         // если задан PIN, стартуем заблокированными

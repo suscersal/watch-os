@@ -9,7 +9,9 @@
 #define MAX_BIND     48      // подписанных на переменные меток на экран
 #define BIND_TMPL    160
 
-typedef struct { lv_obj_t *obj; char tmpl[BIND_TMPL]; } bind_t;
+enum { BIND_LABEL = 0, BIND_BAR = 1 };
+// kind == BIND_LABEL: tmpl - шаблон текста с @переменными; BIND_BAR: tmpl - имя переменной со значением индикатора.
+typedef struct { lv_obj_t *obj; char tmpl[BIND_TMPL]; uint8_t kind; } bind_t;
 
 typedef struct app_run {
     const app_info_t *app;

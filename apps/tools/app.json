@@ -1,0 +1,53 @@
+{
+  "start": "main",
+  "vars": { "vol": "30", "note": "", "item": "" },
+  "screens": {
+    "main": {
+      "title": "Tools",
+      "ui": [
+        { "type": "slider", "text": "Volume: @vol", "var": "vol", "min": 0, "max": 100 },
+        { "type": "bar", "var": "vol", "min": 0, "max": 100, "color": "#10B981" },
+        { "type": "spacer", "h": 8 },
+        { "type": "list", "var": "item",
+          "items": ["Planets table", "Note", "Static table"],
+          "on_click": [ { "do": "goto", "screen": "chosen" } ] }
+      ]
+    },
+    "chosen": {
+      "title": "Chosen",
+      "ui": [
+        { "type": "label", "text": "You tapped: @item" },
+        { "type": "button", "text": "Ask AI table (stub)",
+          "on_click": [
+            { "do": "ai.ask_table", "q": "Planets", "out": "result" },
+            { "do": "goto", "screen": "table" } ] },
+        { "type": "button", "text": "Notes (storage)", "on_click": [ { "do": "goto", "screen": "note" } ] },
+        { "type": "button", "text": "Static table", "on_click": [ { "do": "goto", "screen": "static" } ] }
+      ]
+    },
+    "table": {
+      "title": "AI table",
+      "ui": [ { "type": "table", "src": "result", "header": true } ]
+    },
+    "static": {
+      "title": "Static",
+      "ui": [ { "type": "table", "header": true,
+                "rows": [ ["Planet", "Moons", "Day"], ["Earth", 1, "24 h"], ["Mars", 2, "24.6 h"], ["Jupiter", 95, "10 h"] ] } ]
+    },
+    "note": {
+      "title": "Note",
+      "ui": [
+        { "type": "input", "var": "note", "placeholder": "Text" },
+        { "type": "row", "children": [
+          { "type": "button", "text": "Save",
+            "on_click": [ { "do": "store.set", "key": "note", "value": "@note" }, { "do": "toast", "text": "Saved" } ] },
+          { "type": "button", "text": "Load",
+            "on_click": [ { "do": "store.get", "key": "note", "out": "note", "default": "(empty)" } ] },
+          { "type": "button", "text": "Delete",
+            "on_click": [ { "do": "store.remove", "key": "note" }, { "do": "set", "var": "note", "value": "" } ] }
+        ] },
+        { "type": "label", "text": "Now: @note" }
+      ]
+    }
+  }
+}

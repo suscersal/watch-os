@@ -1,5 +1,7 @@
 #include "syscalls.h"
+#include "storage.h"
 #include "sys_ui.h"
+#include "tables.h"
 #include "vars.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +76,45 @@ static void sc_ai_ask(app_run_t *r, const cJSON *a)
     vars_set(vars_valid_name(out) ? out : "result", res);
 }
 
+// Заглушка таблицы ИИ: настоящий запрос появится вместе с настройками и ключом API.
+static void sc_ai_ask_table(app_run_t *r, const cJSON *a)
+{
+    LV_UNUSED(r);
+    char q[VAR_VAL];
+    arg_text(a, "q", q, sizeof q);
+    const char *out = jstr(a, "out");
+    const char *cells[] = { "Query", "Answer", q, "(stub)", "Rows", "3" };
+    tables_set_cells(vars_valid_name(out) ? out : "result", 3, 2, cells);
+}
+
+// Постоянное хранилище приложения. Ключи и значения - текст; доступ только к своим данным.
+static void sc_store_get(app_run_t *r, const cJSON *a)
+{
+    const char *key = jstr(a, "key");
+    if (!vars_valid_name(key)) { sys_toast("store: bad key"); return; }
+    const char *out = jstr(a, "out");
+    char val[VAR_VAL], def[VAR_VAL];
+    arg_text(a, "default", def, sizeof def);
+    if (!storage_get(r->app->id, key, val, sizeof val)) snprintf(val, sizeof val, "%s", def);
+    vars_set(vars_valid_name(out) ? out : key, val);
+}
+
+static void sc_store_set(app_run_t *r, const cJSON *a)
+{
+    const char *key = jstr(a, "key");
+    if (!vars_valid_name(key)) { sys_toast("store: bad key"); return; }
+    char val[VAR_VAL];
+    arg_text(a, "value", val, sizeof val);
+    if (!storage_set(r->app->id, key, val)) sys_toast("Cannot save");
+}
+
+static void sc_store_remove(app_run_t *r, const cJSON *a)
+{
+    const char *key = jstr(a, "key");
+    if (!vars_valid_name(key)) { sys_toast("store: bad key"); return; }
+    storage_remove(r->app->id, key);
+}
+
 // Подтверждение: показывает системное окно; при OK выполняет on_yes.
 static struct { app_run_t *r; const cJSON *yes; } pend_confirm;
 
@@ -103,7 +144,11 @@ static const sys_entry_t table[] = {
     {"toast",  0,        false, sc_toast},
     {"goto",   0,        true,  sc_goto},
     {"back",   0,        true,  sc_back},
-    {"ai.ask", PERM_NET, false, sc_ai_ask},
+    {"ai.ask",       PERM_NET,     false, sc_ai_ask},
+    {"ai.ask_table", PERM_NET,     false, sc_ai_ask_table},
+    {"store.get",    PERM_STORAGE, false, sc_store_get},
+    {"store.set",    PERM_STORAGE, false, sc_store_set},
+    {"store.remove", PERM_STORAGE, false, sc_store_remove},
 };
 
 void sys_run_actions(app_run_t *r, const cJSON *actions)

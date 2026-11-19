@@ -30,3 +30,12 @@ add_custom_target(run
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     DEPENDS main
     VERBATIM)
+
+# Автоматическая проверка ядра на виртуальном экране (без окна и SDL-ввода), с AddressSanitizer/UBSan:
+#   cmake --build build --target watch_smoke && ./bin/watch_smoke
+add_executable(watch_smoke EXCLUDE_FROM_ALL tests/smoke.c src/launcher.c ${WATCH_SOURCES})
+target_compile_definitions(watch_smoke PRIVATE LV_CONF_INCLUDE_SIMPLE)
+target_compile_options(watch_smoke PRIVATE -g -fno-omit-frame-pointer -fsanitize=address,undefined)
+target_link_options(watch_smoke PRIVATE -fsanitize=address,undefined)
+target_include_directories(watch_smoke PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} ${SDL2_INCLUDE_DIRS})
+target_link_libraries(watch_smoke lvgl ${SDL2_LIBRARIES} ${CJSON_LIB} CURL::libcurl m pthread)
