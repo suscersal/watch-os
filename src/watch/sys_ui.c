@@ -91,6 +91,26 @@ static void kb_cb(lv_event_t *e)
     if (c == LV_EVENT_READY || c == LV_EVENT_CANCEL) sys_keyboard_hide();
 }
 
+bool sys_keyboard_visible(void)
+{
+    return kb && !lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN);
+}
+
+void sys_keyboard_press_outside(lv_obj_t *target)
+{
+    if (!sys_keyboard_visible()) return;
+    lv_obj_t *ta = lv_keyboard_get_textarea(kb);
+    for (lv_obj_t *o = target; o; o = lv_obj_get_parent(o))
+        if (o == kb || o == ta) return;   // нажали на клавиатуру или на само поле
+    sys_keyboard_hide();
+}
+
+static void indev_press_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    sys_keyboard_press_outside(lv_indev_get_active_obj());
+}
+
 static void kb_create(void)
 {
     kb = lv_keyboard_create(lv_layer_top());
@@ -100,6 +120,10 @@ static void kb_create(void)
     lv_obj_set_size(kb, lv_pct(100), lv_pct(45));
     lv_obj_set_style_text_font(kb, WATCH_FONT_BODY, LV_PART_ITEMS);   // тема задаёт свой шрифт кнопкам: без этого кириллица не отрисуется
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+
+    // Нажатие вне клавиатуры и поля закрывает её (иначе случайно открытую клавиатуру нечем убрать, кроме клавиши OK).
+    for (lv_indev_t *i = lv_indev_get_next(NULL); i; i = lv_indev_get_next(i))
+        lv_indev_add_event_cb(i, indev_press_cb, LV_EVENT_PRESSED, NULL);
 
     const char *const *maps[4] = { map_en_l, map_en_u, map_ru_l, map_ru_u };
     lv_keyboard_mode_t modes[4] = { LV_KEYBOARD_MODE_USER_1, LV_KEYBOARD_MODE_USER_2, LV_KEYBOARD_MODE_USER_3, LV_KEYBOARD_MODE_USER_4 };

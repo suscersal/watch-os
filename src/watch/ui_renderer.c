@@ -58,7 +58,7 @@ static void input_cb(lv_event_t *e)
 {
     lv_obj_t *ta = lv_event_get_target(e);
     lv_event_code_t c = lv_event_get_code(e);
-    if (c == LV_EVENT_FOCUSED) {
+    if (c == LV_EVENT_FOCUSED || c == LV_EVENT_CLICKED) {
         sys_keyboard_attach(ta);
     } else if (c == LV_EVENT_VALUE_CHANGED) {
         const char *var = lv_event_get_user_data(e);

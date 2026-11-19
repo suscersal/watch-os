@@ -16,21 +16,22 @@
 
 #define SCR_W    410
 #define SCR_H    502
-#define ICON     84     // диаметр иконки
-#define PITCH_X  92     // шаг по горизонтали
-#define PITCH_Y  80     // шаг по вертикали (~ PITCH_X * 0.866 - сотовая сетка)
-#define TOP_PAD  40
+#define ICON     92     // диаметр иконки в покое
+#define PITCH_X  100    // шаг по горизонтали
+#define PITCH_Y  87     // шаг по вертикали (~ PITCH_X * 0.866 - сотовая сетка)
+#define MIN_TOP  30     // отступ сверху, если сетка не помещается и прокручивается
 
-// эффект "рыбий глаз" как на Apple Watch
-#define FISH_R0   110   // внутри этого радиуса от центра экрана иконки 100%
-#define FISH_R1   270   // на этом радиусе и дальше - минимальный размер
-#define SCALE_MIN 90    // 256 = 100%
+// Эффект "рыбий глаз" как на Apple Watch: иконка у центра экрана крупнее, к краям уменьшается
+// и подтягивается к центру, чтобы расстояние между иконками не росло.
+#define SCALE_MAX   272   // 256 = 100%; в центре иконка чуть больше обычной
+#define SCALE_MIN   140   // у краёв
+#define FISH_R      270   // на таком расстоянии от центра экрана достигается минимум
+#define PULL_PCT    30    // насколько сильно уменьшенные иконки подтягиваются к центру (%)
 
 static lv_obj_t *launcher;
 
-// Масштаб каждой иконки зависит от расстояния до центра экрана.
-// Стиль меняем только если масштаб реально изменился: иначе каждый
-// кадр прокрутки перерисовывал бы все иконки зря.
+// Масштаб и сдвиг каждой иконки зависят от расстояния до центра экрана.
+// Стиль меняем только если значение реально изменилось, иначе каждый кадр прокрутки перерисовывал бы всё зря.
 static void fisheye_update(lv_obj_t *cont)
 {
     uint32_t n = lv_obj_get_child_count(cont);
@@ -41,17 +42,20 @@ static void fisheye_update(lv_obj_t *cont)
         int32_t dx = (a.x1 + a.x2) / 2 - SCR_W / 2;
         int32_t dy = (a.y1 + a.y2) / 2 - SCR_H / 2;
         int32_t d = (int32_t)lv_sqrt32((uint32_t)(dx * dx + dy * dy));
+        if (d > FISH_R) d = FISH_R;
 
-        int32_t s;
-        if (d <= FISH_R0)      s = 256;
-        else if (d >= FISH_R1) s = SCALE_MIN;
-        else                   s = 256 - (d - FISH_R0) * (256 - SCALE_MIN) / (FISH_R1 - FISH_R0);
+        int32_t s  = SCALE_MAX - (SCALE_MAX - SCALE_MIN) * d / FISH_R;
+        int32_t pull = (SCALE_MAX - s) * PULL_PCT / SCALE_MAX;        // 0..PULL_PCT процентов
+        int32_t tx = -dx * pull / 100;
+        int32_t ty = -dy * pull / 100;
 
         if (lv_obj_get_style_transform_scale_x(c, 0) != s) {
             lv_obj_set_style_transform_pivot_x(c, ICON / 2, 0);
             lv_obj_set_style_transform_pivot_y(c, ICON / 2, 0);
             lv_obj_set_style_transform_scale(c, s, 0);
         }
+        if (lv_obj_get_style_translate_x(c, 0) != tx) lv_obj_set_style_translate_x(c, tx, 0);
+        if (lv_obj_get_style_translate_y(c, 0) != ty) lv_obj_set_style_translate_y(c, ty, 0);
     }
 }
 
@@ -110,21 +114,30 @@ static void build_grid(void)
     lv_obj_set_style_border_width(cont, 0, 0);
     lv_obj_set_style_radius(cont, 0, 0);
     lv_obj_set_style_pad_all(cont, 0, 0);
-    lv_obj_set_style_pad_bottom(cont, 140, 0);   // запас, чтобы нижние иконки доехали до центра
+    lv_obj_set_style_pad_bottom(cont, 160, 0);   // запас, чтобы нижние иконки доехали до центра
     lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(cont, scroll_cb, LV_EVENT_SCROLL, NULL);
 
+    // Сколько рядов получится: 3 иконки, 4, 3, 4, ...
+    int rows = 0;
+    for (size_t left = n; left > 0; rows++) {
+        size_t cols = (rows % 2 == 0) ? 3 : 4;
+        left = left > cols ? left - cols : 0;
+    }
+    int grid_h = (rows - 1) * PITCH_Y + ICON;
+    int y0 = (SCR_H - grid_h) / 2;            // небольшая сетка стоит по центру экрана, как на часах
+    if (y0 < MIN_TOP) y0 = MIN_TOP;           // большая прокручивается
+
     size_t i = 0;
     int row = 0;
-
     while (i < n) {
-        // ряды чередуются: 3 иконки, 4 иконки, 3, 4...
         int cols = (row % 2 == 0) ? 3 : 4;
-        int total_w = (cols - 1) * PITCH_X + ICON;
+        int in_row = (int)(n - i) < cols ? (int)(n - i) : cols;   // последний ряд может быть неполным
+        int total_w = (in_row - 1) * PITCH_X + ICON;
         int x0 = (SCR_W - total_w) / 2;
-        int y = TOP_PAD + row * PITCH_Y;
+        int y = y0 + row * PITCH_Y;
 
-        for (int c = 0; c < cols && i < n; c++, i++) {
+        for (int c = 0; c < in_row; c++, i++) {
             lv_obj_t *btn = lv_button_create(cont);
             lv_obj_set_size(btn, ICON, ICON);
             lv_obj_set_pos(btn, x0 + c * PITCH_X, y);

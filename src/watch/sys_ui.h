@@ -1,11 +1,16 @@
 // sys_ui.h - системный UI: тост и клавиатура. Рисуется только ядром, поверх приложений (lv_layer_top).
 #pragma once
+#include <stdbool.h>
 #include "lvgl_inc.h"
 
 void sys_ui_init(void);                 // один раз при старте: шрифты системных слоёв
 void sys_toast(const char *text);
 void sys_keyboard_attach(lv_obj_t *textarea);
 void sys_keyboard_hide(void);
+bool sys_keyboard_visible(void);
+// Нажатие на объект target: если клавиатура открыта, а нажали не на неё и не на поле ввода - закрыть её.
+// Вызывается автоматически для каждого нажатия пальцем или мышью (после создания клавиатуры).
+void sys_keyboard_press_outside(lv_obj_t *target);
 void sys_keyboard_set_lang(int ru);     // 0 = EN, 1 = RU (по умолчанию EN)
 int  sys_keyboard_get_lang(void);
 

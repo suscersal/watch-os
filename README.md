@@ -15,6 +15,7 @@ cmake -B build && cmake --build build -j
 ```
 
 Автоматическая проверка ядра (без окна): `cmake --build build --target watch_smoke && ./bin/watch_smoke`.
+Снимок экрана в PNG без окна (удобно смотреть вид и слать мне): `cmake --build build --target watch_shot && ./bin/watch_shot out.png launcher`; шаги `app=<имя>`, `click=<текст>`, `focus`, `tapout` описаны в начале `tests/shot.c`.
 
 Если клонировали без `--recursive`: `git submodule update --init`.
 Нужен LVGL 9.4 или новее (имена `LV_SCREEN_LOAD_ANIM_*`); на часах используется та же 9.5.0.

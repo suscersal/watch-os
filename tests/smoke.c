@@ -26,6 +26,16 @@ static void pump(int n)
     for (int i = 0; i < n; i++) { g_ms += 20; lv_timer_handler(); }
 }
 
+// Виртуальная «мышь»: настоящие нажатия проходят через индев, как в симуляторе и на сенсоре часов.
+static lv_point_t g_pt;
+static lv_indev_state_t g_state = LV_INDEV_STATE_RELEASED;
+static void ptr_read(lv_indev_t *i, lv_indev_data_t *dd) { LV_UNUSED(i); dd->point = g_pt; dd->state = g_state; }
+static void tap(int x, int y)
+{
+    g_pt.x = x; g_pt.y = y; g_state = LV_INDEV_STATE_PRESSED; pump(4);
+    g_state = LV_INDEV_STATE_RELEASED; pump(4);
+}
+
 static unsigned rng = 12345;
 static unsigned rnd(void) { rng = rng * 1103515245u + 12345u; return (rng >> 16) & 0x7fff; }
 
@@ -163,6 +173,54 @@ static void tools_flow(lv_obj_t *launcher)
     }
 }
 
+// Клавиатура: открывается при фокусе, закрывается нажатием вне неё и поля, снова открывается по нажатию на поле.
+static void keyboard_flow(lv_obj_t *launcher)
+{
+    const app_info_t *a = NULL;
+    for (size_t i = 0; i < app_manager_count(); i++)
+        if (strcmp(app_manager_get(i)->name, "Hello") == 0) a = app_manager_get(i);
+    CHECK(a != NULL, "Hello app present");
+    if (!a) return;
+    app_runtime_launch(a, launcher);
+    pump(30);
+
+    nfound = 0; collect(lv_screen_active(), &lv_textarea_class);
+    CHECK(nfound >= 1, "input present");
+    if (!nfound) return;
+    lv_obj_t *ta = found[0];
+
+    CHECK(!sys_keyboard_visible(), "keyboard hidden at start");
+    lv_obj_send_event(ta, LV_EVENT_FOCUSED, NULL);
+    CHECK(sys_keyboard_visible(), "keyboard shown on focus");
+
+    sys_keyboard_press_outside(ta);                       // нажали на само поле: остаётся
+    CHECK(sys_keyboard_visible(), "tap on the input keeps keyboard");
+    sys_keyboard_press_outside(lv_screen_active());       // нажали на пустое место экрана: закрылась
+    CHECK(!sys_keyboard_visible(), "tap outside closes keyboard");
+
+    lv_obj_send_event(ta, LV_EVENT_CLICKED, NULL);        // поле уже в фокусе, нажатие снова открывает клавиатуру
+    CHECK(sys_keyboard_visible(), "tap on focused input reopens keyboard");
+
+    // то же через настоящие нажатия (координаты экрана 410x502: поле сверху, клавиатура внизу, пустое место между ними)
+    CHECK(sys_keyboard_visible(), "keyboard open before real taps");
+    tap(200, 400);
+    CHECK(sys_keyboard_visible(), "real tap on keyboard keeps it open");
+    tap(200, 122);
+    CHECK(sys_keyboard_visible(), "real tap on input keeps keyboard open");
+    tap(200, 245);
+    CHECK(!sys_keyboard_visible(), "real tap on empty area closes keyboard");
+    tap(200, 122);
+    CHECK(sys_keyboard_visible(), "real tap on input opens keyboard again");
+
+    sys_keyboard_hide();
+    for (int k = 0; k < 8 && lv_screen_active() != launcher; k++) {
+        nfound = 0; collect(lv_screen_active(), &lv_button_class);
+        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);
+        pump(25);
+    }
+    printf("keyboard flow done\n");
+}
+
 int main(void)
 {
     lv_init();
@@ -171,6 +229,9 @@ int main(void)
     static uint8_t buf[410 * 60 * 4];
     lv_display_set_buffers(d, buf, NULL, sizeof buf, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(d, flush_cb);
+    lv_indev_t *ptr = lv_indev_create();
+    lv_indev_set_type(ptr, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(ptr, ptr_read);
 
     storage_init("data");
     unit_tests();
@@ -183,6 +244,7 @@ int main(void)
     CHECK(napps >= 3, "apps found");
 
     tools_flow(launcher);
+    keyboard_flow(launcher);
 
     int clicks = 0;
     for (size_t i = 0; i < napps; i++) {

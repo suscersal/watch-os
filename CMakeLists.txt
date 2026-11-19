@@ -62,3 +62,10 @@ target_compile_options(watch_smoke PRIVATE -g -fno-omit-frame-pointer -fsanitize
 target_link_options(watch_smoke PRIVATE -fsanitize=address,undefined)
 target_include_directories(watch_smoke PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} ${SDL2_INCLUDE_DIRS})
 target_link_libraries(watch_smoke lvgl ${SDL2_LIBRARIES} ${CJSON_LIB} CURL::libcurl m Threads::Threads)
+
+# Рисует экраны в PNG без окна, чтобы посмотреть вид интерфейса (см. комментарий в tests/shot.c):
+#   cmake --build build --target watch_shot && ./bin/watch_shot out.png launcher
+add_executable(watch_shot EXCLUDE_FROM_ALL tests/shot.c src/launcher.c ${WATCH_SOURCES} ${CJSON_SRC})
+target_compile_definitions(watch_shot PRIVATE LV_CONF_INCLUDE_SIMPLE)
+target_include_directories(watch_shot PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} ${SDL2_INCLUDE_DIRS})
+target_link_libraries(watch_shot lvgl ${SDL2_LIBRARIES} ${CJSON_LIB} CURL::libcurl m Threads::Threads)
