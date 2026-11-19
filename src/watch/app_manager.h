@@ -10,7 +10,7 @@
 
 typedef struct {
     char     id[32];      // имя папки
-    char     name[24];
+    char     name[48];
     char     icon[16];    // ключ из таблицы иконок, см. app_icon_symbol()
     uint32_t color;       // 0xRRGGBB
     uint32_t perms;       // PERM_*

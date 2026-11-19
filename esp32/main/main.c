@@ -9,8 +9,11 @@
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
 #include "wifi.h"
+#include "watch/power.h"
 
 void watch_launcher_create(void);   // src/launcher.c
+
+static void set_brightness(int pct) { bsp_display_brightness_set(pct); }
 
 static const char *TAG = "watch";
 
@@ -68,8 +71,9 @@ void app_main(void)
         ESP_LOGE(TAG, "display init failed");
         return;
     }
-    // После инициализации BSP яркость равна 0: без этого вызова экран остаётся чёрным.
-    bsp_display_brightness_set(CONFIG_WATCH_BRIGHTNESS);
+    // После инициализации BSP яркость равна 0: без явной установки экран остаётся чёрным.
+    // Яркостью дальше управляет watch/power (затемнение и выключение при бездействии, меню Display).
+    power_set_backend(set_brightness);
 
     if (!fs_ok) ESP_LOGW(TAG, "running without storage: no apps, PIN will not be saved");
 

@@ -8,7 +8,7 @@
 ```json
 {"name":"Tools","icon":"list","color":"#06B6D4","permissions":["net","storage"]}
 ```
-- `name` - до 23 байт (русская буква = 2 байта).
+- `name` - до 47 байт (русская буква = 2 байта); более длинное обрезается по границе символа.
 - `icon` - один из ключей: `calc list edit bell gps settings mail audio image call plus ok home file folder video wifi battery charge refresh play trash download`.
 - `color` - цвет плитки `#RRGGBB`.
 - `permissions` - `net` (запросы в интернет и к ИИ), `storage` (постоянное хранилище). Без разрешения вызов не выполняется.

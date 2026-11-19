@@ -2,6 +2,7 @@
 #include "fs.h"
 #include "cJSON.h"
 #include "installer.h"
+#include "display_app.h"
 #include "security_app.h"
 #include "lvgl_inc.h"
 #include <stdio.h>
@@ -30,6 +31,22 @@ const char *app_icon_symbol(const char *key)
     for (size_t i = 0; i < sizeof(icon_tbl) / sizeof(icon_tbl[0]); i++)
         if (key && strcmp(icon_tbl[i].key, key) == 0) return icon_tbl[i].sym;
     return LV_SYMBOL_FILE;
+}
+
+// Если имя обрезано посреди русской буквы, отбрасываем её остаток, иначе на экране появится мусор.
+static void utf8_trim(char *s)
+{
+    size_t n = strlen(s);
+    while (n > 0 && ((unsigned char)s[n - 1] & 0xC0) == 0x80) n--;            // хвост из продолжений
+    if (n > 0 && (unsigned char)s[n - 1] >= 0xC0) {                           // начало символа без продолжения
+        unsigned char c = (unsigned char)s[n - 1];
+        size_t need = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : 2;
+        if (strlen(s) - (n - 1) < need) n--;
+        else n = strlen(s);
+    } else if (n > 0) {
+        n = strlen(s);
+    }
+    s[n] = '\0';
 }
 
 static const char *jstr(const cJSON *o, const char *k)
@@ -68,6 +85,7 @@ static void dir_cb(const char *folder, void *ud)
     memset(a, 0, sizeof *a);
     snprintf(a->id, sizeof a->id, "%s", folder);
     snprintf(a->name, sizeof a->name, "%s", jstr(m, "name") ? jstr(m, "name") : folder);
+    utf8_trim(a->name);
     snprintf(a->icon, sizeof a->icon, "%s", jstr(m, "icon") ? jstr(m, "icon") : "file");
     snprintf(a->dir, sizeof a->dir, "%s/%s", root, folder);
 
@@ -104,6 +122,15 @@ size_t app_manager_scan(const char *root)
         snprintf(a->icon, sizeof a->icon, "download");
         a->color = 0x0EA5E9;
         a->builtin = installer_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_display");
+        snprintf(a->name, sizeof a->name, "Display");
+        snprintf(a->icon, sizeof a->icon, "image");
+        a->color = 0xD946EF;
+        a->builtin = display_open;
     }
     if (napps < APPS_MAX) {
         app_info_t *a = &apps[napps++];

@@ -7,6 +7,7 @@
 #include "watch/app_runtime.h"
 #include "watch/sys_ui.h"
 #include "watch/storage.h"
+#include "watch/power.h"
 #include "watch/tables.h"
 #include "watch/vars.h"
 #include "watch/syscalls.h"
@@ -221,6 +222,69 @@ static void keyboard_flow(lv_obj_t *launcher)
     printf("keyboard flow done\n");
 }
 
+static int g_last_pct = -1;
+static void backend_cb(int pct) { g_last_pct = pct; }
+
+// Затемнение и выключение экрана; касание выключенного экрана только будит и ничего не нажимает.
+static void power_flow(lv_obj_t *launcher)
+{
+    power_set_backend(backend_cb);
+    power_set_settings(2, 4, 80);
+    int dim, off, br;
+    power_get_settings(&dim, &off, &br);
+    CHECK(dim == 2 && off == 4 && br == 80, "power settings stored");
+    power_set_settings(10, 5, 50);
+    power_get_settings(&dim, &off, &br);
+    CHECK(off > dim, "off is later than dim");
+    power_set_settings(2, 4, 80);
+
+    lv_display_trigger_activity(NULL);
+    pump(20);
+    CHECK(!power_dimmed() && !power_screen_off() && g_last_pct == 80, "screen on at start");
+    pump(150);                      // 3 с бездействия (шаг pump = 20 мс)
+    CHECK(power_dimmed() && !power_screen_off(), "dimmed after dim timeout");
+    CHECK(g_last_pct < 80 && g_last_pct > 0, "brightness lowered when dimmed");
+    pump(150);                      // ещё 3 с
+    CHECK(power_screen_off() && g_last_pct == 0, "screen off after off timeout");
+
+    // нажатие на то место, где в лаунчере иконка: экран просыпается, приложение не запускается
+    CHECK(app_runtime_current() == NULL, "no app before wake tap");
+    tap(205, 251);
+    CHECK(!power_screen_off() && !power_dimmed() && g_last_pct == 80, "tap wakes the screen");
+    CHECK(app_runtime_current() == NULL && lv_screen_active() == launcher, "wake tap is swallowed");
+
+    // обычное нажатие по иконке после пробуждения работает
+    // (после затемнения, когда экран ещё не выключен, оно тоже проходит и будит)
+    pump(150);
+    CHECK(power_dimmed(), "dimmed again");
+    power_wake();
+    CHECK(!power_dimmed() && g_last_pct == 80, "wake restores brightness");
+
+    power_preview_brightness(30);
+    CHECK(g_last_pct == 30, "preview applies brightness");
+
+    power_set_settings(0, 0, 70);   // никогда не гасить на время остальных проверок
+    power_wake();
+}
+
+static void name_test(void)
+{
+    // имя из манифеста длиннее лимита обрезается по границе символа
+    for (size_t i = 0; i < app_manager_count(); i++) {
+        const char *n = app_manager_get(i)->name;
+        size_t len = strlen(n);
+        int ok = 1;
+        for (size_t k = 0; k < len; k++) {
+            unsigned char c = (unsigned char)n[k];
+            size_t need = c < 0x80 ? 1 : c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 0;
+            if (need == 0 || k + need > len) { ok = 0; break; }
+            for (size_t j = 1; j < need; j++) if (((unsigned char)n[k + j] & 0xC0) != 0x80) ok = 0;
+            k += need - 1;
+        }
+        CHECK(ok, "app name is valid UTF-8");
+    }
+}
+
 int main(void)
 {
     lv_init();
@@ -237,6 +301,7 @@ int main(void)
     unit_tests();
 
     watch_launcher_create();
+    power_set_settings(0, 0, 70);    // экран не гасим, пока проверяем остальное (гашение проверяет power_flow)
     pump(30);
     lv_obj_t *launcher = lv_screen_active();
     size_t napps = app_manager_count();
@@ -245,6 +310,8 @@ int main(void)
 
     tools_flow(launcher);
     keyboard_flow(launcher);
+    power_flow(launcher);
+    name_test();
 
     int clicks = 0;
     for (size_t i = 0; i < napps; i++) {
