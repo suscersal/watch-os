@@ -69,3 +69,27 @@ add_executable(watch_shot EXCLUDE_FROM_ALL tests/shot.c src/launcher.c ${WATCH_S
 target_compile_definitions(watch_shot PRIVATE LV_CONF_INCLUDE_SIMPLE)
 target_include_directories(watch_shot PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} ${SDL2_INCLUDE_DIRS})
 target_link_libraries(watch_shot lvgl ${SDL2_LIBRARIES} ${CJSON_LIB} CURL::libcurl m Threads::Threads)
+
+# Проверка протокола синхронизации, TCP-приёма и галереи (нужны Python 3 и Pillow):
+#   cmake --build build --target sync_test
+# Тест стирает data/ и apps/ в рабочей папке, поэтому запускается в build/sync_test_run.
+add_executable(watch_sync_test EXCLUDE_FROM_ALL tests/gallery_sync_test.c src/launcher.c ${WATCH_SOURCES} ${CJSON_SRC})
+target_compile_definitions(watch_sync_test PRIVATE LV_CONF_INCLUDE_SIMPLE)
+target_compile_options(watch_sync_test PRIVATE -g -fno-omit-frame-pointer -fsanitize=address)
+target_link_options(watch_sync_test PRIVATE -fsanitize=address)
+target_include_directories(watch_sync_test PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} ${SDL2_INCLUDE_DIRS})
+target_link_libraries(watch_sync_test lvgl ${SDL2_LIBRARIES} ${CJSON_LIB} CURL::libcurl m Threads::Threads)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/sync_test_run)
+add_custom_target(sync_test
+    COMMAND ${CMAKE_COMMAND} -E make_directory fx
+    COMMAND python3 ${PROJECT_SOURCE_DIR}/tests/make_fixtures.py fx
+    COMMAND ${CMAKE_COMMAND} -E env ASAN_OPTIONS=detect_leaks=0 $<TARGET_FILE:watch_sync_test> fx ${PROJECT_SOURCE_DIR}/tools/sync_client.py
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/sync_test_run
+    DEPENDS watch_sync_test
+    VERBATIM)
+
+# Ядро как сервер синхронизации без окна (для проверки клиентов, например tests/run_kotlin_selftest.py)
+add_executable(sync_server EXCLUDE_FROM_ALL tests/sync_server.c src/launcher.c ${WATCH_SOURCES} ${CJSON_SRC})
+target_compile_definitions(sync_server PRIVATE LV_CONF_INCLUDE_SIMPLE)
+target_include_directories(sync_server PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} ${SDL2_INCLUDE_DIRS})
+target_link_libraries(sync_server lvgl ${SDL2_LIBRARIES} ${CJSON_LIB} CURL::libcurl m Threads::Threads)

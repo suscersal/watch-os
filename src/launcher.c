@@ -7,6 +7,7 @@
 #include "watch/power.h"
 #include "watch/auth.h"
 #include "watch/lock_screen.h"
+#include "watch/photos.h"
 #include "watch/sys_ui.h"
 #include "watch/watch_fonts.h"
 
@@ -86,6 +87,7 @@ void watch_launcher_create(void)
     auth_init(WATCH_ROOT "data");
     storage_init(WATCH_ROOT "data");         // хранилище приложений; папка data/ приложениям недоступна
     power_init(WATCH_ROOT "data");           // затемнение и выключение экрана при бездействии
+    photos_init(WATCH_ROOT "data/photos");   // фото с телефона (Gallery)
     app_manager_scan(WATCH_ROOT "apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
     build_grid();
     lock_screen_init();         // если задан PIN, стартуем заблокированными

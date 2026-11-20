@@ -1,5 +1,6 @@
 #include "lock_screen.h"
 #include "auth.h"
+#include "clock.h"
 #include "pinpad.h"
 #include "sys_ui.h"
 #include "watch_fonts.h"
@@ -7,10 +8,20 @@
 
 static lv_obj_t   *ov;          // затемнение + клавиатура
 static lv_obj_t   *pad;
+static lv_obj_t   *time_lbl;    // время (если телефон его синхронизировал)
 static lv_timer_t *count_timer; // обратный отсчёт во время задержки
 static lv_timer_t *idle_timer;
 
 static void refresh_state(void);
+
+static void refresh_time(void)
+{
+    if (!ov || !time_lbl) return;
+    struct tm t;
+    char s[8] = "";
+    if (clock_local(&t)) snprintf(s, sizeof s, "%02d:%02d", t.tm_hour, t.tm_min);
+    lv_label_set_text(time_lbl, s);
+}
 
 static void count_cb(lv_timer_t *t)
 {
@@ -39,7 +50,7 @@ static void unlock(void)
 {
     if (count_timer) { lv_timer_delete(count_timer); count_timer = NULL; }
     lv_obj_delete_async(ov);
-    ov = NULL; pad = NULL;
+    ov = NULL; pad = NULL; time_lbl = NULL;
     lv_display_trigger_activity(NULL);   // отсчёт бездействия начинается заново
 }
 
@@ -80,6 +91,12 @@ void lock_screen_lock(void)
     lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);
     lv_obj_add_flag(ov, LV_OBJ_FLAG_CLICKABLE);   // перехватывает все касания
 
+    time_lbl = lv_label_create(ov);
+    lv_obj_set_style_text_font(time_lbl, WATCH_FONT_LARGE, 0);
+    lv_obj_set_style_text_color(time_lbl, lv_color_hex(0x9CA3AF), 0);
+    lv_obj_align(time_lbl, LV_ALIGN_TOP_MID, 0, 18);
+    refresh_time();
+
     pad = pinpad_create(ov, auth_pin_len(), pin_cb, NULL);
     lv_obj_center(pad);
     pinpad_set_title(pad, "Enter PIN");
@@ -91,6 +108,7 @@ bool lock_screen_is_locked(void) { return ov != NULL; }
 static void idle_cb(lv_timer_t *t)
 {
     LV_UNUSED(t);
+    refresh_time();   // минуты меняются, пока экран заблокирован
     int to = auth_timeout_s();
     if (!ov && auth_has_pin() && to > 0 && lv_display_get_inactive_time(NULL) > (uint32_t)to * 1000u)
         lock_screen_lock();

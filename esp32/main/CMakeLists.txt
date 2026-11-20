@@ -12,7 +12,7 @@ idf_component_register(
     INCLUDE_DIRS . ${WATCH_ROOT}/src
     REQUIRES
         esp_wifi esp_event esp_netif nvs_flash esp_http_client esp-tls mbedtls json
-        esp_timer esp_system
+        esp_timer esp_system lwip
         waveshare__esp32_s3_touch_amoled_2_06 lvgl__lvgl joltwallet__littlefs)
 
 # lvgl.h подключается как "lvgl.h" (см. src/watch/lvgl_inc.h); данные лежат на LittleFS в /flash

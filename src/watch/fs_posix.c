@@ -16,7 +16,7 @@ bool fs_list_dir(const char *path, fs_dir_cb cb, void *ud)
     return true;
 }
 
-char *fs_read_file(const char *path, size_t max_size)
+char *fs_read_file_n(const char *path, size_t max_size, size_t *len_out)
 {
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;
@@ -29,7 +29,13 @@ char *fs_read_file(const char *path, size_t max_size)
     size_t rd = fread(buf, 1, (size_t)sz, f);
     fclose(f);
     buf[rd] = '\0';
+    if (len_out) *len_out = rd;
     return buf;
+}
+
+char *fs_read_file(const char *path, size_t max_size)
+{
+    return fs_read_file_n(path, max_size, NULL);
 }
 
 #include <errno.h>

@@ -4,6 +4,8 @@
 #include "installer.h"
 #include "display_app.h"
 #include "security_app.h"
+#include "gallery_app.h"
+#include "sync_app.h"
 #include "lvgl_inc.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -128,9 +130,27 @@ size_t app_manager_scan(const char *root)
         memset(a, 0, sizeof *a);
         snprintf(a->id, sizeof a->id, "sys_display");
         snprintf(a->name, sizeof a->name, "Display");
-        snprintf(a->icon, sizeof a->icon, "image");
+        snprintf(a->icon, sizeof a->icon, "video");
         a->color = 0xD946EF;
         a->builtin = display_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_gallery");
+        snprintf(a->name, sizeof a->name, "Gallery");
+        snprintf(a->icon, sizeof a->icon, "image");
+        a->color = 0xF97316;
+        a->builtin = gallery_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_sync");
+        snprintf(a->name, sizeof a->name, "Sync");
+        snprintf(a->icon, sizeof a->icon, "refresh");
+        a->color = 0x14B8A6;
+        a->builtin = sync_app_open;
     }
     if (napps < APPS_MAX) {
         app_info_t *a = &apps[napps++];

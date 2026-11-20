@@ -15,3 +15,6 @@ char *fs_read_file(const char *path, size_t max_size);
 bool fs_mkdir(const char *path);                                  // true, если создан или уже есть
 bool fs_write_file(const char *path, const char *data, size_t n); // атомарно: tmp + rename
 bool fs_remove(const char *path);                                 // файл или пустой каталог
+
+// То же, но возвращает длину (для бинарных файлов, например JPEG).
+char *fs_read_file_n(const char *path, size_t max_size, size_t *len_out);

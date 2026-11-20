@@ -497,11 +497,11 @@
  *  If size is not set to 0, the decoder will fail to decode when the cache is full.
  *  If size is 0, the cache function is not enabled and the decoded memory will be
  *  released immediately after use. */
-#define LV_CACHE_DEF_SIZE       0
+#define LV_CACHE_DEF_SIZE       (8 * 1024 * 1024)   /* кэш декодированных картинок: сетка миниатюр + просмотр */
 
 /** Default number of image header cache entries. The cache is used to store the headers of images
  *  The main logic is like `LV_CACHE_DEF_SIZE` but for image headers. */
-#define LV_IMAGE_HEADER_CACHE_DEF_CNT 0
+#define LV_IMAGE_HEADER_CACHE_DEF_CNT 64
 
 /** Number of stops allowed per gradient. Increase this to allow more stops.
  *  This adds (sizeof(lv_color_t) + 1) bytes per additional stop. */
@@ -894,9 +894,9 @@
 #endif
 
 /** API for memory-mapped file access. */
-#define LV_USE_FS_MEMFS 0
+#define LV_USE_FS_MEMFS 1   /* нужен TJPGD, чтобы читать JPEG прямо из памяти */
 #if LV_USE_FS_MEMFS
-    #define LV_FS_MEMFS_LETTER '\0'     /**< Set an upper-case driver-identifier letter for this driver (e.g. 'A'). */
+    #define LV_FS_MEMFS_LETTER 'M'     /**< Set an upper-case driver-identifier letter for this driver (e.g. 'A'). */
 #endif
 
 /** API for LittleFs. */
@@ -942,7 +942,7 @@
 
 /** JPG + split JPG decoder library.
  *  Split JPG is a custom format optimized for embedded systems. */
-#define LV_USE_TJPGD 0
+#define LV_USE_TJPGD 1   /* JPEG-декодер для галереи (baseline JPEG, без прогрессивных) */
 
 /** libjpeg-turbo decoder library.
  *  - Supports complete JPEG specifications and high-performance JPEG decoding. */
