@@ -13,7 +13,7 @@ idf_component_register(
     REQUIRES
         esp_wifi esp_event esp_netif nvs_flash esp_http_client esp-tls mbedtls json
         esp_timer esp_system lwip driver
-        waveshare__esp32_s3_touch_amoled_2_06 lvgl__lvgl joltwallet__littlefs)
+        waveshare__esp32_s3_touch_amoled_2_06 lvgl joltwallet__littlefs)
 
 # lvgl.h подключается как "lvgl.h" (см. src/watch/lvgl_inc.h); данные лежат на LittleFS в /flash
 target_compile_definitions(${COMPONENT_LIB} PRIVATE LV_LVGL_H_INCLUDE_SIMPLE WATCH_ROOT="/flash/")
