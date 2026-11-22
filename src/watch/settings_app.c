@@ -1,5 +1,6 @@
 #include "settings_app.h"
 #include "clock.h"
+#include "colorgrid_ui.h"
 #include "pairing.h"
 #include "plat.h"
 #include "settings.h"
@@ -194,6 +195,23 @@ static void w_net_cb(lv_event_t *e)
     wifi_ctl_connect(w_pick, "");
 }
 
+// цветной код: пароль Wi-Fi вводится сеткой цветов, без клавиатуры (формат: colorcode.h, tools/colorcode.py)
+static void cg_done(const char *ssid, const char *pass, void *ud)
+{
+    LV_UNUSED(ud);
+    wifi_ctl_connect(ssid, pass);
+    pop_cb(NULL);
+}
+
+static void open_colorcode_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    lv_obj_t *body;
+    lv_obj_t *scr = sys_screen_create("Color code", pop_cb, &body);
+    colorgrid_create(body, cg_done, NULL);
+    push(w_scr, scr);
+}
+
 static void open_wifi_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
@@ -202,6 +220,7 @@ static void open_wifi_cb(lv_event_t *e)
     lv_obj_add_event_cb(w_scr, w_deleted_cb, LV_EVENT_DELETE, NULL);
     w_status = label(body, "", 0x9CA3AF, NULL);
     button(body, "Scan", 0x3B82F6, w_scan_cb, NULL);
+    button(body, "Enter color code", 0x8B5CF6, open_colorcode_cb, NULL);
     w_list = lv_obj_create(body);
     lv_obj_remove_style_all(w_list);
     lv_obj_set_width(w_list, lv_pct(100));
@@ -214,6 +233,15 @@ static void open_wifi_cb(lv_event_t *e)
     w_scan_cb(NULL);
     w_tick(NULL);
     push(g_main_scr, w_scr);
+}
+
+void settings_open_wifi_from(lv_obj_t *parent)
+{
+    lv_obj_t *prev = g_main_scr;
+    g_depth = 0;
+    g_main_scr = parent;       // push() запомнит parent как экран, на который вернёт "назад"
+    open_wifi_cb(NULL);
+    g_main_scr = prev;
 }
 
 // ---------- часовой пояс ----------

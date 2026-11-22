@@ -12,6 +12,7 @@
 #include "watch/clock.h"
 #include "watch/power.h"
 #include "watch/settings.h"
+#include "watch/setup_wizard.h"
 #include "watch/watchface.h"
 
 void watch_launcher_create(void);   // src/launcher.c
@@ -84,7 +85,8 @@ void app_main(void)
     if (bsp_display_lock(0)) {
         watch_launcher_create();
         clock_init();                                    // время из RTC PCF85063, пояс из настроек
-        watchface_show(lv_screen_active());              // после включения - циферблат
+        if (setup_wizard_needed()) setup_wizard_show(lv_screen_active());   // первый запуск: мастер настройки
+        else watchface_show(lv_screen_active());         // после включения - циферблат
         bsp_display_unlock();
     }
 }

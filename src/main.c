@@ -25,6 +25,7 @@
 void watch_launcher_create(void);
 #include "watch/clock.h"
 #include "watch/watchface.h"
+#include "watch/setup_wizard.h"
 #include <SDL.h>
 
 #include "hal/hal.h"
@@ -74,7 +75,8 @@ int main(int argc, char **argv)
   /* - etc. */
   watch_launcher_create();
   clock_init();                          /* время из RTC (на ПК - системное), пояс из настроек */
-  watchface_show(lv_screen_active());    /* после включения сразу циферблат; свайп вверх - сетка приложений */
+  if (setup_wizard_needed()) setup_wizard_show(lv_screen_active());   /* первый запуск: мастер настройки */
+  else watchface_show(lv_screen_active());    /* после включения сразу циферблат; свайп вверх - сетка приложений */
 
   while(1) {
     /* Periodically call the lv_task handler.

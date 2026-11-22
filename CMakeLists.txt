@@ -93,3 +93,10 @@ add_executable(sync_server EXCLUDE_FROM_ALL tests/sync_server.c src/launcher.c $
 target_compile_definitions(sync_server PRIVATE LV_CONF_INCLUDE_SIMPLE)
 target_include_directories(sync_server PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} ${SDL2_INCLUDE_DIRS})
 target_link_libraries(sync_server lvgl ${SDL2_LIBRARIES} ${CJSON_LIB} CURL::libcurl m Threads::Threads)
+
+# Цветной код 16x16 (ввод пароля Wi-Fi без клавиатуры): кодек без LVGL, с AddressSanitizer/UBSan:
+#   cmake --build build --target colorcode_test
+add_executable(watch_colorcode_test EXCLUDE_FROM_ALL tests/colorcode_test.c src/watch/colorcode.c)
+target_compile_options(watch_colorcode_test PRIVATE -g -Wall -Wextra -fsanitize=address,undefined)
+target_link_options(watch_colorcode_test PRIVATE -fsanitize=address,undefined)
+add_custom_target(colorcode_test COMMAND watch_colorcode_test DEPENDS watch_colorcode_test VERBATIM)
