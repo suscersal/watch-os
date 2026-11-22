@@ -34,6 +34,7 @@ static void on_event(sync_event_t ev, void *ud)
         set_status(t, 0x22C55E);
         break;
     case SYNC_EV_PHOTO_DELETED: sys_toast("Photo removed by phone"); break;
+    case SYNC_EV_MESSAGE:       break;     // уведомление уже лежит в messages; на экране синхронизации ничего не меняем
     case SYNC_EV_DISCONNECTED:  if (sync_net_running()) set_status(got_photos ? "Done. Waiting for phone" : "Waiting for phone", 0x9CA3AF); break;
     }
 }
