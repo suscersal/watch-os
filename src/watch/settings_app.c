@@ -424,7 +424,7 @@ void settings_open(lv_obj_t *launcher)
     g_launcher = launcher;
     g_depth = 0;
     lv_obj_t *body;
-    g_main_scr = sys_screen_create("Settings", main_back_cb, &body);
+    g_main_scr = sys_screen_create_root("Settings", main_back_cb, &body);
     button(body, LV_SYMBOL_WIFI "  Wi-Fi", 0x3B82F6, open_wifi_cb, NULL);
     button(body, LV_SYMBOL_REFRESH "  Time zone", 0x14B8A6, open_tz_cb, NULL);
     button(body, LV_SYMBOL_EDIT "  API key", 0x8B5CF6, open_key_cb, NULL);

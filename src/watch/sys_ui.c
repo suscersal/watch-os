@@ -305,6 +305,39 @@ static void swipe_back_cb(lv_event_t *e)
     }
 }
 
+// Как на iPhone: свайп вверх от нижнего края выходит из приложения. Узкая прозрачная полоса внизу ловит только такие
+// свайпы (остальные жесты и нажатия её не касаются), а тонкая «планка» показывает, откуда тянуть.
+#define HOME_BAR_H 40
+static void home_swipe_cb(lv_event_t *e)
+{
+    lv_indev_t *in = lv_indev_active();
+    if (in && lv_indev_get_gesture_dir(in) == LV_DIR_TOP) {
+        lv_indev_wait_release(in);
+        lv_event_cb_t cb = lv_event_get_user_data(e);
+        if (cb) cb(e);
+    }
+}
+
+static void add_home_bar(lv_obj_t *scr, lv_event_cb_t exit_cb)
+{
+    lv_obj_t *zone = lv_obj_create(scr);
+    lv_obj_remove_style_all(zone);
+    lv_obj_remove_flag(zone, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(zone, LV_OBJ_FLAG_FLOATING | LV_OBJ_FLAG_CLICKABLE);   // вне flex-раскладки экрана, поверх содержимого
+    lv_obj_remove_flag(zone, LV_OBJ_FLAG_GESTURE_BUBBLE);                  // LVGL шлёт жест первому родителю БЕЗ этого флага: пусть это будет сама полоса
+    lv_obj_set_size(zone, lv_pct(100), HOME_BAR_H);
+    lv_obj_align(zone, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_add_event_cb(zone, home_swipe_cb, LV_EVENT_GESTURE, exit_cb);
+    lv_obj_t *pill = lv_obj_create(zone);
+    lv_obj_remove_style_all(pill);
+    lv_obj_remove_flag(pill, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(pill, 120, 5);
+    lv_obj_set_style_radius(pill, 3, 0);
+    lv_obj_set_style_bg_color(pill, lv_color_hex(0x8E8E93), 0);
+    lv_obj_set_style_bg_opa(pill, LV_OPA_50, 0);
+    lv_obj_align(pill, LV_ALIGN_BOTTOM_MID, 0, -8);
+}
+
 // Общая сборка экрана. root=true: главный экран приложения (название цветом приложения слева, время справа,
 // выход свайпом вправо). root=false: вложенный экран (круглая кнопка "назад" слева, название по центру).
 static lv_obj_t *g_right_lbl;
@@ -380,6 +413,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
     lv_obj_set_style_pad_row(body, 12, 0);
     lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
     *body_out = body;
+    if (root && back_cb) add_home_bar(scr, back_cb);
     return scr;
 }
 

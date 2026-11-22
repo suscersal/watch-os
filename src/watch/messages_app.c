@@ -102,7 +102,7 @@ static void build_list(void)
 void messages_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    g_list_scr = sys_screen_create("Messages", back_cb, &g_list_body);
+    g_list_scr = sys_screen_create_root("Messages", back_cb, &g_list_body);
     lv_obj_add_event_cb(g_list_scr, list_deleted_cb, LV_EVENT_DELETE, NULL);
     build_list();
     lv_screen_load_anim(g_list_scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);

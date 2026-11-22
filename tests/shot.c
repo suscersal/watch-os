@@ -13,6 +13,7 @@
 //   face              показать циферблат
 //   time=<epoch>,<tz> задать время (epoch UTC, пояс в минутах), чтобы снимок не зависел от часов компьютера
 //   msg=<app>|<title>|<text>   добавить уведомление (как будто пришло с телефона)
+//   swipeup           свайп вверх от нижнего края (выход из приложения, как на iPhone)
 //   swipe             свайп вправо (выход из приложения; на лаунчере ничего не делает)
 //   tap=<x>,<y>       настоящее нажатие в точку экрана (410x502)
 //   wait=<мс>         подождать (время виртуальное): идёт запись, воспроизведение, таймеры
@@ -46,6 +47,12 @@ static void tap(int x, int y)
 {
     g_pt.x = x; g_pt.y = y; g_state = LV_INDEV_STATE_PRESSED; pump(4);
     g_state = LV_INDEV_STATE_RELEASED; pump(4);
+}
+static void swipe_up(void)
+{
+    g_pt.x = 205; g_pt.y = 490; g_state = LV_INDEV_STATE_PRESSED; pump(3);   // от нижнего края, как свайп выхода
+    for (int y = 440; y >= 240; y -= 50) { g_pt.y = y; pump(2); }
+    g_state = LV_INDEV_STATE_RELEASED; pump(40);
 }
 static void swipe_right(void)
 {
@@ -210,6 +217,8 @@ int main(int argc, char **argv)
             *t = *x = '\0';
             messages_add((uint32_t)i, 0, tmp, t + 1, x + 1);
             pump(30);
+        } else if (strcmp(s, "swipeup") == 0) {
+            swipe_up();
         } else if (strcmp(s, "swipe") == 0) {
             swipe_right();
         } else if (strncmp(s, "tap=", 4) == 0) {
