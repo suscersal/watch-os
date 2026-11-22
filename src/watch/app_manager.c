@@ -5,6 +5,8 @@
 #include "display_app.h"
 #include "security_app.h"
 #include "gallery_app.h"
+#include "messages_app.h"
+#include "settings_app.h"
 #include "sync_app.h"
 #include "lvgl_inc.h"
 #include <stdio.h>
@@ -25,7 +27,7 @@ static const struct { const char *key; const char *sym; } icon_tbl[] = {
     {"home", LV_SYMBOL_HOME},     {"file", LV_SYMBOL_FILE},   {"folder", LV_SYMBOL_DIRECTORY},
     {"video", LV_SYMBOL_VIDEO},   {"wifi", LV_SYMBOL_WIFI},   {"battery", LV_SYMBOL_BATTERY_FULL},
     {"charge", LV_SYMBOL_CHARGE}, {"refresh", LV_SYMBOL_REFRESH}, {"play", LV_SYMBOL_PLAY},
-    {"trash", LV_SYMBOL_TRASH},   {"download", LV_SYMBOL_DOWNLOAD},
+    {"trash", LV_SYMBOL_TRASH},   {"download", LV_SYMBOL_DOWNLOAD}, {"eye", LV_SYMBOL_EYE_CLOSE},
 };
 
 const char *app_icon_symbol(const char *key)
@@ -155,9 +157,27 @@ size_t app_manager_scan(const char *root)
     if (napps < APPS_MAX) {
         app_info_t *a = &apps[napps++];
         memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_messages");
+        snprintf(a->name, sizeof a->name, "Messages");
+        snprintf(a->icon, sizeof a->icon, "mail");
+        a->color = 0x22C55E;
+        a->builtin = messages_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_settings");
+        snprintf(a->name, sizeof a->name, "Settings");
+        snprintf(a->icon, sizeof a->icon, "settings");
+        a->color = 0x3B82F6;
+        a->builtin = settings_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
         snprintf(a->id, sizeof a->id, "sys_security");
         snprintf(a->name, sizeof a->name, "Security");
-        snprintf(a->icon, sizeof a->icon, "settings");
+        snprintf(a->icon, sizeof a->icon, "eye");
         a->color = 0x6B7280;
         a->builtin = security_open;
     }

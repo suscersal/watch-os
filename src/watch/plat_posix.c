@@ -1,5 +1,7 @@
 #include "plat.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 bool plat_random(void *buf, size_t n)
 {
@@ -27,4 +29,26 @@ bool plat_local_ip(char *buf, size_t n)
     }
     freeifaddrs(ifa);
     return found;
+}
+
+bool plat_rtc_read(int64_t *epoch_utc)
+{
+    time_t t = time(NULL);
+    if (t < 1500000000) return false;
+    *epoch_utc = (int64_t)t;
+    return true;
+}
+
+void plat_rtc_write(int64_t epoch_utc) { (void)epoch_utc; }   // системное время на ПК не трогаем
+
+bool plat_battery(int *pct, bool *charging)
+{
+    const char *e = getenv("WATCH_BATTERY");
+    if (!e || !*e) return false;
+    int v = atoi(e);
+    if (v < 0) v = 0;
+    if (v > 100) v = 100;
+    *pct = v;
+    *charging = strchr(e, '+') != NULL;
+    return true;
 }

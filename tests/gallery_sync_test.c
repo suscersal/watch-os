@@ -7,6 +7,8 @@
 #include "watch/crc32.h"
 #include "watch/gallery_app.h"
 #include "watch/lock_screen.h"
+#include "watch/messages.h"
+#include "watch/settings.h"
 #include "watch/lvgl_inc.h"
 #include "watch/photos.h"
 #include "watch/sync_app.h"
@@ -158,6 +160,15 @@ static int send_photo(uint32_t id, uint32_t taken, const uint8_t *th, size_t tn,
     return r;
 }
 
+static size_t mk_msg(uint8_t *o, uint32_t id, const char *app, const char *title, const char *text)
+{
+    size_t al = strlen(app), tl = strlen(title), xl = strlen(text);
+    w32(o, id); w32(o + 4, 1700000000);
+    o[8] = (uint8_t)al; o[9] = (uint8_t)tl; o[10] = (uint8_t)xl; o[11] = (uint8_t)(xl >> 8);
+    memcpy(o + 12, app, al); memcpy(o + 12 + al, title, tl); memcpy(o + 12 + al + tl, text, xl);
+    return 12 + al + tl + xl;
+}
+
 int main(int argc, char **argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -235,7 +246,7 @@ int main(int argc, char **argv)
     w32(b, 0xC6); w32(b + 4, 1); w32(b + 8, 100); w32(b + 12, 10 * 1024 * 1024); w32(b + 16, 0);
     CHECK(tx(SYNC_T_PHOTO_BEGIN, b, sizeof b) && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_TOO_BIG, "10 MB announcement rejected up front");
     CHECK(tx(SYNC_T_PHOTO_LIST, NULL, 0) && resp_type() == SYNC_T_LIST && out[5] == 2 && out[7] == 0xB2 && out[11] == 0xA1, "LIST: 2 ids, newest (B) first");
-    CHECK(tx(SYNC_T_MESSAGE, NULL, 0) && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_UNSUPPORTED, "MESSAGE reserved: unsupported");
+    CHECK(tx(SYNC_T_MESSAGE, NULL, 0) && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_BAD_FRAME, "empty MESSAGE: bad frame");
     uint8_t big_hdr[5] = { SYNC_T_PHOTO_DATA, 0xFF, 0xFF, 0xFF, 0x7F };
     out_n = 0;
     CHECK(!sync_rx_feed(big_hdr, 5) && resp_type() == SYNC_T_ERR, "absurd frame length: error + close");
@@ -256,6 +267,72 @@ int main(int argc, char **argv)
     CHECK(!lock_screen_is_locked(), "unlocked");
     auth_remove_pin();
     sync_rx_close();
+
+    // ============ уведомления: постоянный код, ограниченный доступ, MESSAGE ============
+    {
+        uint8_t m[400];
+        sync_rx_set_notify_code("654321");
+        open_session("123456");
+        CHECK(hello("654321") && resp_type() == SYNC_T_HELLO_OK, "notify code accepted");
+        CHECK(out[5 + 1] == 0 && out[5 + 2] == 0, "notify session reports 0 photos");
+        size_t n = mk_msg(m, 7, "Telegram", "Anna", "See you at 7?");
+        CHECK(tx(SYNC_T_MESSAGE, m, n) && resp_type() == SYNC_T_OK && messages_count() == 1, "MESSAGE stored");
+        CHECK(strcmp(messages_get(0)->title, "Anna") == 0 && strcmp(messages_get(0)->app, "Telegram") == 0 && messages_unread() == 1, "message fields and unread count");
+        CHECK(tx(SYNC_T_PHOTO_LIST, NULL, 0) && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_SCOPE, "notify code cannot list photos (link stays)");
+        n = mk_msg(m, 7, "Telegram", "Anna", "Edited");
+        CHECK(tx(SYNC_T_MESSAGE, m, n) && messages_count() == 1 && strcmp(messages_get(0)->text, "Edited") == 0, "same id replaces the message");
+        n = mk_msg(m, 8, "Mail", "Привет", "Текст");
+        CHECK(tx(SYNC_T_MESSAGE, m, n) && messages_count() == 2 && strcmp(messages_get(0)->title, "Привет") == 0, "utf-8 message, newest first");
+        n = mk_msg(m, 9, "A", "B", "C");
+        m[10] = 50;                                                  // длина текста не сходится с кадром
+        CHECK(tx(SYNC_T_MESSAGE, m, n) && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_BAD_FRAME && messages_count() == 2, "inconsistent lengths rejected");
+        char big[300]; memset(big, 'x', sizeof big - 1); big[sizeof big - 1] = 0;
+        n = mk_msg(m, 10, "A", "B", big);
+        CHECK(tx(SYNC_T_MESSAGE, m, n) && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_TOO_BIG, "oversized text rejected");
+        CHECK(hello("123456") && resp_type() == SYNC_T_HELLO_OK, "one-time code still gives full access on the same server");
+        sync_rx_close();
+
+        // при блокировке PIN постоянный код пускает, полный - нет
+        CHECK(auth_set_pin("1234"), "PIN set for notify test");
+        lock_screen_lock(); run(100);
+        open_session("123456");
+        CHECK(hello("654321") && resp_type() == SYNC_T_HELLO_OK, "notify code works on a locked watch");
+        n = mk_msg(m, 11, "Signal", "Bob", "hi");
+        CHECK(tx(SYNC_T_MESSAGE, m, n) && messages_count() == 3, "message accepted while locked");
+        open_session("123456");
+        CHECK(!hello("123456") && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_LOCKED, "full code refused on a locked watch");
+        for (const char *k = "1234"; *k; k++) { char sk[2] = { *k, 0 }; press(lv_layer_sys(), sk); }
+        run(300);
+        auth_remove_pin();
+        sync_rx_set_notify_code(NULL);
+        open_session("123456");
+        CHECK(hello("654321") && resp_type() == SYNC_T_ERR && resp_code() == SYNC_E_AUTH, "notify code off: rejected");
+        sync_rx_close();
+        messages_clear();
+        CHECK(messages_count() == 0 && messages_unread() == 0, "messages cleared");
+
+        // настройки сохраняются в файл
+        settings_set_notify(true);
+        CHECK(strlen(settings_notify_code()) == 6, "notify code generated");
+        char code1[8]; snprintf(code1, sizeof code1, "%s", settings_notify_code());
+        settings_set_api_key("sk-test-123");
+        settings_wifi_set("Home", "pass1234");
+        settings_set_tz(false, 330);
+        settings_init("data");
+        char ss[34], pp[66];
+        CHECK(settings_notify_on() && strcmp(settings_notify_code(), code1) == 0, "notify settings persist");
+        CHECK(strcmp(settings_api_key(), "sk-test-123") == 0, "API key persists");
+        CHECK(settings_wifi_get(ss, sizeof ss, pp, sizeof pp) && strcmp(ss, "Home") == 0 && strcmp(pp, "pass1234") == 0, "Wi-Fi network persists");
+        CHECK(!settings_tz_auto() && settings_tz_min() == 330, "manual time zone persists");
+        clock_set(1700000000, 180);                                  // телефон шлёт +3, но выбран ручной пояс +5:30
+        { struct tm lt; CHECK(clock_local(&lt) && lt.tm_hour == 3 && lt.tm_min == 43, "manual zone overrides the phone's zone"); }
+        clock_set_tz(true, 0);
+        clock_set(1700000000, 180);
+        { struct tm lt; CHECK(clock_local(&lt) && lt.tm_hour == 1 && lt.tm_min == 13 && settings_tz_min() == 180, "auto zone follows the phone and is remembered"); }
+        settings_set_notify(false);
+        settings_wifi_clear();
+        settings_set_api_key("");
+    }
 
     // ============ галерея ============
     gallery_open(lv_screen_active()); run(500);

@@ -3,6 +3,8 @@ package com.watchos.sync
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.provider.Settings
+import android.app.AlertDialog
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -73,7 +75,73 @@ class MainActivity : Activity() {
         status = text("", 15f).apply { gravity = Gravity.START }
         root.addView(status)
 
+        root.addView(text("Phone notifications", 20f, Color.BLACK).apply { setPadding(0, pad, 0, 0) })
+        notifyStatus = text("", 14f)
+        root.addView(notifyStatus)
+        root.addView(Button(this).apply { text = "Allow notification access"; setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) } })
+        root.addView(Button(this).apply { text = "Choose apps to forward"; setOnClickListener { chooseApps() } })
+        root.addView(text("On the watch: Settings > Notifications, then scan the QR code with the phone camera or Google Lens.", 13f))
+
         setContentView(ScrollView(this).apply { addView(root) })
+        handleLink(intent)
+        showNotifyStatus()
+    }
+
+    private lateinit var notifyStatus: TextView
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleLink(intent)
+        showNotifyStatus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        showNotifyStatus()
+    }
+
+    /** Ссылка из QR: обычный режим подставляет адрес и код в поля, mode=notify сохраняет сопряжение для уведомлений. */
+    private fun handleLink(i: Intent?) {
+        val uri = i?.data ?: return
+        if (uri.scheme != "watchsync") return
+        val host = uri.getQueryParameter("host") ?: return
+        val port = uri.getQueryParameter("port")?.toIntOrNull() ?: 8765
+        val code = uri.getQueryParameter("code") ?: return
+        if (code.length != 6 || !code.all { it in '0'..'9' }) { say("Bad link from the watch."); return }
+        if (uri.getQueryParameter("mode") == "notify") {
+            getSharedPreferences("watch", Context.MODE_PRIVATE).edit()
+                .putString("notify_host", host).putInt("notify_port", port).putString("notify_code", code).apply()
+            say("Paired for notifications with $host:$port.")
+        } else {
+            hostEdit.setText(host); portEdit.setText(port.toString()); codeEdit.setText(code)
+            say("Address and code filled in from the watch. Press a button to send.")
+        }
+    }
+
+    private fun showNotifyStatus() {
+        val p = getSharedPreferences("watch", Context.MODE_PRIVATE)
+        val listener = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")?.contains(packageName) == true
+        val pairedTxt = if (NotifyPrefs.paired(this)) "paired with ${p.getString("notify_host", "")}" else "not paired"
+        val apps = p.getStringSet("notify_apps", emptySet())?.size ?: 0
+        notifyStatus.text = "Watch: $pairedTxt. Access: ${if (listener) "allowed" else "not allowed"}. Apps: ${if (apps == 0) "all" else "$apps selected"}."
+    }
+
+    /** Список приложений с галочками; пустой выбор = пересылать все. */
+    private fun chooseApps() {
+        val pm = packageManager
+        val launch = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = pm.queryIntentActivities(launch, 0).map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+            .distinctBy { it.first }.sortedBy { it.second.lowercase() }
+        val prefs = getSharedPreferences("watch", Context.MODE_PRIVATE)
+        val chosen = (prefs.getStringSet("notify_apps", emptySet()) ?: emptySet()).toMutableSet()
+        AlertDialog.Builder(this)
+            .setTitle("Forward only these apps (none = all)")
+            .setMultiChoiceItems(apps.map { it.second }.toTypedArray(), BooleanArray(apps.size) { apps[it].first in chosen }) { _, which, on ->
+                if (on) chosen.add(apps[which].first) else chosen.remove(apps[which].first)
+            }
+            .setPositiveButton("OK") { _, _ -> prefs.edit().putStringSet("notify_apps", chosen).apply(); showNotifyStatus() }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onDestroy() {

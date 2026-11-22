@@ -27,7 +27,11 @@ object Proto {
     const val T_PHOTO_END = 0x12
     const val T_PHOTO_LIST = 0x13
     const val T_PHOTO_DELETE = 0x14
+    const val T_MESSAGE = 0x20
     const val T_BYE = 0x7F
+    const val MSG_APP_MAX = 32
+    const val MSG_TITLE_MAX = 64
+    const val MSG_TEXT_MAX = 256
     const val R_OK = 0x80
     const val R_HELLO_OK = 0x81
     const val R_ERR = 0x8F
@@ -45,8 +49,18 @@ object Proto {
         7 -> "watch storage is full"
         8 -> "not supported"
         9 -> "watch is locked"
+        10 -> "not allowed with this code"
         else -> "error $code"
     }
+}
+
+/** Обрезает строку до maxBytes в utf-8, не разрывая символ (в том числе суррогатную пару). */
+fun utf8Cut(s: String, maxBytes: Int): ByteArray {
+    val full = s.toByteArray(Charsets.UTF_8)
+    if (full.size <= maxBytes) return full
+    var n = maxBytes
+    while (n > 0 && (full[n].toInt() and 0xC0) == 0x80) n--   // full[n] - продолжение символа: отступаем к его началу
+    return full.copyOf(n)
 }
 
 /**
@@ -118,6 +132,18 @@ class WatchClient(private val host: String, private val port: Int) : Closeable {
         val b = ByteBuffer.allocate(10).order(ByteOrder.LITTLE_ENDIAN)
         b.putLong(epochSeconds).putShort(tzMinutes.toShort())
         send(Proto.T_TIME, b.array())
+        reply()
+    }
+
+    /** Уведомление (кадр MESSAGE). id один и тот же у обновлённого уведомления: часы заменят прежнее. */
+    fun sendMessage(id: Int, epochSeconds: Long, app: String, title: String, text: String) {
+        val a = utf8Cut(app, Proto.MSG_APP_MAX)
+        val t = utf8Cut(title, Proto.MSG_TITLE_MAX)
+        val x = utf8Cut(text, Proto.MSG_TEXT_MAX)
+        val b = ByteBuffer.allocate(12 + a.size + t.size + x.size).order(ByteOrder.LITTLE_ENDIAN)
+        b.putInt(id).putInt(epochSeconds.toInt()).put(a.size.toByte()).put(t.size.toByte()).putShort(x.size.toShort())
+        b.put(a).put(t).put(x)
+        send(Proto.T_MESSAGE, b.array())
         reply()
     }
 

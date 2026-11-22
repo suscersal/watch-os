@@ -2,6 +2,7 @@
 #include "clock.h"
 #include "crc32.h"
 #include "lock_screen.h"
+#include "messages.h"
 #include "photos.h"
 #include "sync_proto.h"
 #include <stdio.h>
@@ -10,8 +11,11 @@
 
 #define MAX_AUTH_FAILS 3
 
+typedef enum { SCOPE_NONE, SCOPE_FULL, SCOPE_MSG } scope_t;
+
 typedef struct {
     bool open, authed;
+    scope_t scope;
     char code[SYNC_CODE_LEN + 1];
     int  auth_fails;
     sync_io_t io;
@@ -30,8 +34,15 @@ typedef struct {
 } sess_t;
 
 static sess_t        S;
+static char          g_notify_code[SYNC_CODE_LEN + 1];
 static sync_event_cb g_cb;
 static void         *g_cb_ud;
+
+void sync_rx_set_notify_code(const char *code)
+{
+    memset(g_notify_code, 0, sizeof g_notify_code);
+    if (code && strlen(code) == SYNC_CODE_LEN) memcpy(g_notify_code, code, SYNC_CODE_LEN);
+}
 
 void sync_rx_set_event_cb(sync_event_cb cb, void *ud) { g_cb = cb; g_cb_ud = ud; }
 
@@ -79,27 +90,38 @@ void sync_rx_close(void)
     S.payload = NULL;
     S.open = false;
     S.authed = false;
+    S.scope = SCOPE_NONE;
     emit(SYNC_EV_DISCONNECTED);
 }
 
 bool sync_rx_authenticated(void) { return S.open && S.authed; }
 
-static void on_hello(void)
+// Сравнение кода за постоянное время. Пустой код (одноразовый закрыт или уведомления выключены) никогда не совпадает.
+static bool code_match(const char *expect)
+{
+    if (!expect[0]) return false;
+    uint8_t diff = 0;
+    for (int i = 0; i < SYNC_CODE_LEN; i++) diff |= (uint8_t)(S.payload[1 + i] ^ (uint8_t)expect[i]);
+    return diff == 0;
+}
+
+static void on_hello(bool locked)
 {
     if (S.len < 1 + SYNC_CODE_LEN || S.payload[0] != SYNC_PROTO_VERSION) { send_err(SYNC_T_HELLO, SYNC_E_BAD_FRAME); return; }
-    // сравнение кода за постоянное время
-    uint8_t diff = 0;
-    for (int i = 0; i < SYNC_CODE_LEN; i++) diff |= (uint8_t)(S.payload[1 + i] ^ (uint8_t)S.code[i]);
-    if (diff != 0) {
+    bool full = code_match(S.code);
+    bool msg  = code_match(g_notify_code);          // оба сравнения выполняются всегда
+    if (locked && !msg) { send_err(SYNC_T_HELLO, SYNC_E_LOCKED); S.auth_fails = MAX_AUTH_FAILS; return; }   // полный доступ при блокировке закрыт
+    if (!full && !msg) {
         S.auth_fails++;
         send_err(SYNC_T_HELLO, SYNC_E_AUTH);
         emit(SYNC_EV_AUTH_FAIL);
         return;
     }
     S.authed = true;
+    S.scope = full ? SCOPE_FULL : SCOPE_MSG;
     uint8_t p[9];
     p[0] = SYNC_PROTO_VERSION;
-    size_t cnt = photos_count();
+    size_t cnt = full ? photos_count() : 0;         // сопряжение для уведомлений о фото ничего не знает
     p[1] = (uint8_t)cnt; p[2] = (uint8_t)(cnt >> 8);
     p[3] = (uint8_t)PHOTOS_MAX; p[4] = (uint8_t)(PHOTOS_MAX >> 8);
     wr32(p + 5, PHOTO_FULL_MAX_BYTES);
@@ -167,23 +189,48 @@ static void on_delete(void)
     else send_err(SYNC_T_PHOTO_DELETE, SYNC_E_STATE);
 }
 
+// MESSAGE: id u32, ts u32, app_len u8, title_len u8, text_len u16, app, title, text. Длины должны сходиться с размером кадра.
+static void on_message(void)
+{
+    if (S.len < 12) { send_err(SYNC_T_MESSAGE, SYNC_E_BAD_FRAME); return; }
+    uint32_t id = rd32(S.payload), ts = rd32(S.payload + 4);
+    size_t al = S.payload[8], tl = S.payload[9], xl = (size_t)S.payload[10] | ((size_t)S.payload[11] << 8);
+    if (al > SYNC_MSG_APP_MAX || tl > SYNC_MSG_TITLE_MAX || xl > SYNC_MSG_TEXT_MAX || 12 + al + tl + xl != S.len) {
+        send_err(SYNC_T_MESSAGE, al > SYNC_MSG_APP_MAX || tl > SYNC_MSG_TITLE_MAX || xl > SYNC_MSG_TEXT_MAX ? SYNC_E_TOO_BIG : SYNC_E_BAD_FRAME);
+        return;
+    }
+    char app[SYNC_MSG_APP_MAX + 1], title[SYNC_MSG_TITLE_MAX + 1], text[SYNC_MSG_TEXT_MAX + 1];
+    memcpy(app, S.payload + 12, al);           app[al] = '\0';
+    memcpy(title, S.payload + 12 + al, tl);    title[tl] = '\0';
+    memcpy(text, S.payload + 12 + al + tl, xl); text[xl] = '\0';
+    messages_add(id, ts, app, title, text);
+    send_ok(SYNC_T_MESSAGE, 0);
+    emit(SYNC_EV_MESSAGE);
+}
+
 // Возвращает false, если соединение надо закрыть.
 static bool on_frame(void)
 {
-    if (lock_screen_is_locked()) { send_err(S.type, SYNC_E_LOCKED); return false; }
+    bool locked = lock_screen_is_locked();
     if (S.type == SYNC_T_BYE) return false;
     if (S.type == SYNC_T_HELLO) {
-        on_hello();
+        on_hello(locked);
         return S.auth_fails < MAX_AUTH_FAILS;
     }
+    if (locked && S.scope != SCOPE_MSG) { send_err(S.type, SYNC_E_LOCKED); return false; }
     if (!S.authed) { send_err(S.type, SYNC_E_STATE); return false; }
+    if (S.scope == SCOPE_MSG && S.type != SYNC_T_TIME && S.type != SYNC_T_MESSAGE) {
+        send_err(S.type, SYNC_E_SCOPE);
+        return true;
+    }
     switch (S.type) {
     case SYNC_T_TIME:         on_time(); break;
+    case SYNC_T_MESSAGE:      on_message(); break;
     case SYNC_T_PHOTO_BEGIN:  on_photo_begin(); break;
     case SYNC_T_PHOTO_END:    on_photo_end(); break;
     case SYNC_T_PHOTO_LIST:   on_list(); break;
     case SYNC_T_PHOTO_DELETE: on_delete(); break;
-    default:                  send_err(S.type, S.type == SYNC_T_MESSAGE ? SYNC_E_UNSUPPORTED : SYNC_E_BAD_FRAME); break;
+    default:                  send_err(S.type, SYNC_E_BAD_FRAME); break;
     }
     return true;
 }

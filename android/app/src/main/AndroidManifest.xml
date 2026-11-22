@@ -4,6 +4,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN" /></intent>   <!-- список приложений для фильтра уведомлений -->
+    </queries>
+
     <application
         android:allowBackup="false"
         android:label="Watch Sync"
@@ -15,6 +19,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- QR с часов: watchsync://pair?host=...&port=...&code=...[&mode=notify] -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="watchsync" android:host="pair" />
+            </intent-filter>
         </activity>
+
+        <service
+            android:name=".NotifyService"
+            android:exported="true"
+            android:label="Watch Sync notifications"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

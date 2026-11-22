@@ -19,6 +19,7 @@ static state_t g_state = ST_ON;
 static lv_obj_t   *g_overlay;
 static lv_timer_t *g_timer;
 static void      (*g_backend)(int);
+static void      (*g_wake_cb)(void);
 static char        g_path[96] = "data/power.json";
 
 static int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -42,12 +43,14 @@ static void apply_brightness(void)
 static void set_state(state_t s)
 {
     if (s == g_state) return;
+    state_t prev = g_state;
     g_state = s;
     if (g_overlay) {
         if (s == ST_OFF) lv_obj_remove_flag(g_overlay, LV_OBJ_FLAG_HIDDEN);
         else             lv_obj_add_flag(g_overlay, LV_OBJ_FLAG_HIDDEN);
     }
     apply_brightness();
+    if (prev == ST_OFF && s == ST_ON && g_wake_cb) g_wake_cb();
 }
 
 static void tick_cb(lv_timer_t *t)
@@ -152,3 +155,5 @@ void power_wake(void)
     lv_display_trigger_activity(NULL);
     set_state(ST_ON);
 }
+
+void power_set_wake_cb(void (*cb)(void)) { g_wake_cb = cb; }

@@ -17,12 +17,16 @@ typedef enum {
     SYNC_EV_TIME_SET,
     SYNC_EV_PHOTO,           // принято и сохранено фото
     SYNC_EV_PHOTO_DELETED,
+    SYNC_EV_MESSAGE,         // принято уведомление (уже добавлено в messages)
     SYNC_EV_DISCONNECTED,
 } sync_event_t;
 
 typedef void (*sync_event_cb)(sync_event_t ev, void *ud);
 
 void sync_rx_set_event_cb(sync_event_cb cb, void *ud);
+// Постоянный код сопряжения для уведомлений (NULL - выключен). Сессия с этим кодом ограничена кадрами HELLO/TIME/MESSAGE/BYE
+// и работает даже при блокировке PIN. Одноразовый код (sync_rx_open) даёт полный доступ, но не при блокировке.
+void sync_rx_set_notify_code(const char *code);
 void sync_rx_open(const char *code, const sync_io_t *io);   // началась новая сессия
 void sync_rx_close(void);                                    // сессия завершена (разрыв или закрытие)
 // Подаёт принятые байты. false - соединение нужно закрыть (ошибка протокола, 3 неверных кода, блокировка).

@@ -10,10 +10,17 @@
 //   focus             сфокусировать первое поле ввода (покажет клавиатуру)
 //   scroll=<dy>       прокрутить сетку лаунчера на dy пикселей
 //   tapout            нажать вне клавиатуры и поля (клавиатура должна закрыться)
+//   face              показать циферблат
+//   time=<epoch>,<tz> задать время (epoch UTC, пояс в минутах), чтобы снимок не зависел от часов компьютера
+//   msg=<app>|<title>|<text>   добавить уведомление (как будто пришло с телефона)
+//   wait=<ms>         прокрутить время (анимации, таймеры)
 #include "watch/lvgl_inc.h"
 #include "watch/app_manager.h"
 #include "watch/app_runtime.h"
+#include "watch/clock.h"
+#include "watch/messages.h"
 #include "watch/sys_ui.h"
+#include "watch/watchface.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -163,6 +170,24 @@ int main(int argc, char **argv)
             lv_obj_t *cont = lv_obj_get_child(launcher, 0);
             lv_obj_scroll_by(cont, 0, -atoi(s + 7), LV_ANIM_OFF);
             pump(20);
+        } else if (strcmp(s, "face") == 0) {
+            watchface_show(launcher);
+            pump(30);
+        } else if (strncmp(s, "time=", 5) == 0) {
+            long long e = 0; int tz = 0;
+            if (sscanf(s + 5, "%lld,%d", &e, &tz) != 2) { fprintf(stderr, "bad time step\n"); return 2; }
+            clock_set(e, tz);
+            pump(30);
+        } else if (strncmp(s, "msg=", 4) == 0) {
+            char tmp[400];
+            snprintf(tmp, sizeof tmp, "%s", s + 4);
+            char *t = strchr(tmp, '|'), *x = t ? strchr(t + 1, '|') : NULL;
+            if (!t || !x) { fprintf(stderr, "bad msg step\n"); return 2; }
+            *t = *x = '\0';
+            messages_add((uint32_t)i, 0, tmp, t + 1, x + 1);
+            pump(30);
+        } else if (strncmp(s, "wait=", 5) == 0) {
+            pump(atoi(s + 5) / 20 + 1);
         } else if (strcmp(s, "tapout") == 0) {
             sys_keyboard_press_outside(lv_screen_active());
             pump(20);

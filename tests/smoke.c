@@ -7,7 +7,9 @@
 #include "watch/app_runtime.h"
 #include "watch/sys_ui.h"
 #include "watch/storage.h"
+#include "watch/messages.h"
 #include "watch/power.h"
+#include "watch/watchface.h"
 #include "watch/tables.h"
 #include "watch/vars.h"
 #include "watch/syscalls.h"
@@ -307,6 +309,17 @@ int main(void)
     size_t napps = app_manager_count();
     printf("apps: %u\n", (unsigned)napps);
     CHECK(napps >= 3, "apps found");
+
+    // циферблат и список уведомлений
+    watchface_show(launcher); pump(30);
+    CHECK(watchface_visible(), "watch face shown");
+    lv_obj_send_event(lv_obj_get_child(launcher, -1), LV_EVENT_CLICKED, NULL); pump(40);   // касание открывает сетку
+    CHECK(!watchface_visible(), "tap on the face opens the app grid");
+    watchface_show(launcher); watchface_hide(false);
+    CHECK(!watchface_visible(), "face hidden without animation");
+    for (uint32_t i = 0; i < 25; i++) messages_add(i, 0, "App", "Title", "Text");
+    CHECK(messages_count() == MSG_MAX && messages_get(0)->id == 24, "message list keeps the newest 20");
+    messages_clear();
 
     tools_flow(launcher);
     keyboard_flow(launcher);

@@ -6,6 +6,9 @@
 #define SYNC_PORT          8765
 #define SYNC_CODE_LEN      6
 #define SYNC_MAX_FRAME     20000      // данные одного кадра
+#define SYNC_MSG_APP_MAX   32         // пределы полей MESSAGE, байт (см. messages.h)
+#define SYNC_MSG_TITLE_MAX 64
+#define SYNC_MSG_TEXT_MAX  256
 
 // телефон -> часы
 #define SYNC_T_HELLO         0x01     // proto u8, code[6] ASCII, имя устройства (utf8, до 32 байт)
@@ -15,7 +18,7 @@
 #define SYNC_T_PHOTO_END     0x12
 #define SYNC_T_PHOTO_LIST    0x13
 #define SYNC_T_PHOTO_DELETE  0x14     // id u32
-#define SYNC_T_MESSAGE       0x20     // зарезервировано (уведомления), пока не поддерживается
+#define SYNC_T_MESSAGE       0x20     // уведомление: id u32, ts u32, app_len u8, title_len u8, text_len u16, затем app, title, text (utf8)
 #define SYNC_T_BYE           0x7F
 
 // часы -> телефон
@@ -34,6 +37,7 @@
 #define SYNC_E_STORAGE       7        // нет места или запись не удалась
 #define SYNC_E_UNSUPPORTED   8
 #define SYNC_E_LOCKED        9        // часы заблокированы PIN-кодом
+#define SYNC_E_SCOPE         10       // команда не разрешена для этого кода (постоянный код пускает только TIME и MESSAGE)
 
 // статус в SYNC_T_OK для PHOTO_BEGIN
 #define SYNC_S_READY         0        // можно слать данные

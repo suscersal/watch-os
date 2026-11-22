@@ -3,7 +3,10 @@
 #include "watch/lvgl_inc.h"
 #include "watch/app_manager.h"
 #include "watch/app_runtime.h"
+#include "watch/settings.h"
+#include "watch/statusbar.h"
 #include "watch/storage.h"
+#include "watch/sync_net.h"
 #include "watch/power.h"
 #include "watch/auth.h"
 #include "watch/lock_screen.h"
@@ -84,6 +87,7 @@ void watch_launcher_create(void)
     lv_obj_set_style_text_font(launcher, WATCH_FONT_BODY, 0);   // шрифт с кириллицей
 
     sys_ui_init();
+    settings_init(WATCH_ROOT "data");        // часовой пояс, Wi-Fi, ключ API, уведомления
     auth_init(WATCH_ROOT "data");
     storage_init(WATCH_ROOT "data");         // хранилище приложений; папка data/ приложениям недоступна
     power_init(WATCH_ROOT "data");           // затемнение и выключение экрана при бездействии
@@ -91,6 +95,7 @@ void watch_launcher_create(void)
     app_manager_scan(WATCH_ROOT "apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
     build_grid();
     lock_screen_init();         // если задан PIN, стартуем заблокированными
+    sync_net_notify_apply();    // если включены уведомления с телефона - начать слушать порт
 }
 
 // Перестроить сетку после установки/удаления приложения.
@@ -167,4 +172,5 @@ static void build_grid(void)
 
     lv_obj_update_layout(cont);
     fisheye_update(cont);
+    statusbar_create(launcher, true);      // время, Wi-Fi, батарея поверх сетки
 }

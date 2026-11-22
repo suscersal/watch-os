@@ -9,7 +9,10 @@
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
 #include "wifi.h"
+#include "watch/clock.h"
 #include "watch/power.h"
+#include "watch/settings.h"
+#include "watch/watchface.h"
 
 void watch_launcher_create(void);   // src/launcher.c
 
@@ -51,6 +54,7 @@ void app_main(void)
 {
     init_nvs();
     bool fs_ok = mount_storage();
+    if (fs_ok) settings_init("/flash/data");   // сохранённая сеть нужна Wi-Fi уже при запуске (лаунчер прочитает файл ещё раз)
     wifi_start();                       // подключение идёт в фоне, экран ждать не должен
 
     // BSP по умолчанию даёт задаче LVGL ~6 КБ стека. Сетевые запросы по HTTPS и разбор JSON
@@ -79,6 +83,8 @@ void app_main(void)
 
     if (bsp_display_lock(0)) {
         watch_launcher_create();
+        clock_init();                                    // время из RTC PCF85063, пояс из настроек
+        watchface_show(lv_screen_active());              // после включения - циферблат
         bsp_display_unlock();
     }
 }

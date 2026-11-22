@@ -1,4 +1,5 @@
 #include "sync_app.h"
+#include "pairing.h"
 #include "photos.h"
 #include "plat.h"
 #include "sync_net.h"
@@ -88,6 +89,17 @@ void sync_app_open(lv_obj_t *launcher)
         snprintf(code, sizeof code, "%c%c%c %c%c%c", c[0], c[1], c[2], c[3], c[4], c[5]);
         add_label(body, "Code", 0x9CA3AF, WATCH_FONT_SMALL);
         add_label(body, code, 0x38BDF8, WATCH_FONT_LARGE);
+
+        if (strcmp(ip, "no network") != 0) {          // QR: телефон открывает ссылку и подставляет адрес и код
+            char url[128];
+            pairing_url(url, sizeof url, ip, sync_net_port(), c, false);
+            lv_obj_t *wrap = lv_obj_create(body);
+            lv_obj_remove_style_all(wrap);
+            lv_obj_set_size(wrap, lv_pct(100), LV_SIZE_CONTENT);
+            lv_obj_set_flex_flow(wrap, LV_FLEX_FLOW_ROW);
+            lv_obj_set_flex_align(wrap, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+            pairing_qr_create(wrap, url, 200);
+        }
 
         status_lbl = add_label(body, "Waiting for phone", 0x9CA3AF, NULL);
         sync_rx_set_event_cb(on_event, NULL);
