@@ -431,7 +431,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
     lv_obj_set_style_pad_all(body, 0, 0);
     lv_obj_set_style_pad_left(body, 20, 0);
     lv_obj_set_style_pad_right(body, 20, 0);
-    lv_obj_set_style_pad_bottom(body, 14, 0);
+    lv_obj_set_style_pad_bottom(body, 48, 0);   // последние строки списка доезжают выше полоски "домой" и скруглённых углов
     lv_obj_set_style_pad_row(body, 12, 0);
     lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
     *body_out = body;

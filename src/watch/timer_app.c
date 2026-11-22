@@ -1,6 +1,8 @@
 // Экран по макету: название и длительность сверху, "ОСТАЛОСЬ", крупные цифры, статус, кнопки "Сброс" и "Пауза",
 // прогресс - оранжевая линия по рамке экрана (по часовой стрелке от середины верха).
 #include "timer_app.h"
+#include "clock.h"
+#include "messages.h"
 #include "sys_ui.h"
 #include "watch_fonts.h"
 #include "ws_style.h"
@@ -26,7 +28,10 @@ static uint32_t g_total_ms = DEF_MS;
 static struct { tstate_t st; uint32_t remain_ms, t0; } T;
 
 static lv_obj_t *g_launcher, *scr, *frame, *right_lbl, *cap_lbl, *time_lbl, *status_lbl, *btn_reset, *btn_main, *main_lbl;
-static lv_timer_t *tick;
+static lv_timer_t *tick;      // обновляет экран, пока приложение открыто
+static lv_timer_t *bg;        // следит за концом отсчёта, даже когда приложение закрыто
+static bool        g_inited;  // состояние T заводится один раз и переживает закрытие приложения
+#define MSG_ID_TIMER 0x54494D52u   // "TIMR": новый сигнал заменяет прежний в списке уведомлений
 
 static uint32_t total_ms(void) { return g_total_ms; }
 
@@ -112,12 +117,40 @@ static void frame_draw_cb(lv_event_t *e)
     }
 }
 
+// ---------- конец отсчёта ----------
+// Время вышло: состояние DONE и уведомление (включает экран и показывает тост, если часы не заблокированы PIN).
+static void check_done(void)
+{
+    if (T.st != T_RUN || remaining() != 0) return;
+    T.st = T_DONE;
+    T.remain_ms = 0;
+    char len[24], txt[48];
+    fmt_len(len, sizeof len, total_ms());
+    snprintf(txt, sizeof txt, "Прошло: %s", len);
+    int64_t now;
+    messages_add(MSG_ID_TIMER, clock_utc(&now) ? (uint32_t)now : 0, "Таймер", "Время вышло", txt);
+}
+
+static void refresh(void);
+
+static void bg_cb(lv_timer_t *t)
+{
+    check_done();
+    if (scr) refresh();
+    if (T.st != T_RUN) lv_timer_pause(t);          // ничего не идёт - процессор не будим
+}
+
+static void bg_start(void)
+{
+    if (bg) lv_timer_resume(bg); else bg = lv_timer_create(bg_cb, 250, NULL);
+}
+
 // ---------- обновление экрана ----------
 static void refresh(void)
 {
     if (!scr) return;
+    check_done();
     uint32_t rem = remaining();
-    if (T.st == T_RUN && rem == 0) { T.st = T_DONE; T.remain_ms = 0; }
     uint32_t secs = (rem + 999) / 1000;            // округляем вверх: 7 секунд с хвостиком показываем как 00:08, пока не пройдёт
     char b[12];
     snprintf(b, sizeof b, "%02u:%02u", (unsigned)(secs / 60), (unsigned)(secs % 60));
@@ -148,6 +181,7 @@ static void start_from(uint32_t remain)
     T.remain_ms = remain;
     T.t0 = lv_tick_get();
     T.st = T_RUN;
+    bg_start();
 }
 
 static void main_cb(lv_event_t *e)
@@ -334,9 +368,12 @@ void timer_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
     build_path();
-    memset(&T, 0, sizeof T);
-    T.st = T_IDLE;
-    T.remain_ms = total_ms();
+    if (!g_inited) {                     // первый запуск; дальше идущий или готовый таймер не трогаем
+        g_inited = true;
+        memset(&T, 0, sizeof T);
+        T.st = T_IDLE;
+        T.remain_ms = total_ms();
+    }
 
     lv_obj_t *body;
     scr = sys_screen_create_root_text("Таймер", exit_cb, &body, "", &right_lbl);

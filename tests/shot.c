@@ -8,7 +8,7 @@
 //   app=<имя>         запустить приложение по имени (как в лаунчере)
 //   click=<текст>     нажать кнопку, в подписи которой есть этот текст
 //   focus             сфокусировать первое поле ввода (покажет клавиатуру)
-//   scroll=<dy>       прокрутить сетку лаунчера на dy пикселей
+//   scroll=<dy>       прокрутить сетку лаунчера (или первый прокручиваемый список открытого экрана) на dy пикселей
 //   tapout            нажать вне клавиатуры и поля (клавиатура должна закрыться)
 //   face              показать циферблат
 //   time=<epoch>,<tz> задать время (epoch UTC, пояс в минутах), чтобы снимок не зависел от часов компьютера
@@ -199,7 +199,16 @@ int main(int argc, char **argv)
             pump(40);
         } else if (strncmp(s, "scroll=", 7) == 0) {
             lv_obj_t *cont = lv_obj_get_child(launcher, 0);
-            lv_obj_scroll_by(cont, 0, -atoi(s + 7), LV_ANIM_OFF);
+            if (lv_screen_active() != launcher) {
+                cont = NULL;
+                lv_obj_t *act = lv_screen_active();
+                lv_obj_update_layout(act);
+                for (uint32_t k = 0; k < lv_obj_get_child_count(act) && !cont; k++) {
+                    lv_obj_t *c = lv_obj_get_child(act, k);
+                    if (lv_obj_get_scroll_bottom(c) > 0 || lv_obj_get_scroll_top(c) > 0) cont = c;
+                }
+            }
+            if (cont) (lv_screen_active() == launcher ? lv_obj_scroll_by : lv_obj_scroll_by_bounded)(cont, 0, -atoi(s + 7), LV_ANIM_OFF);
             pump(20);
         } else if (strcmp(s, "face") == 0) {
             watchface_show(launcher);
