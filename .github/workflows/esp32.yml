@@ -1,0 +1,45 @@
+name: ESP32 firmware
+
+on:
+  push:
+    paths:
+      - 'esp32/**'
+      - 'src/**'
+      - 'lv_conf.h'
+      - '.github/workflows/esp32.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # нужно только для выкладки в Releases по тегу
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build with ESP-IDF 5.5
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5
+          target: esp32s3
+          path: esp32
+          command: idf.py build && idf.py merge-bin -o build/watch-os-full.bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: watch-os-firmware
+          path: |
+            esp32/build/watch-os-full.bin
+            esp32/build/watch_os.bin
+            esp32/build/bootloader/bootloader.bin
+            esp32/build/partition_table/partition-table.bin
+            esp32/build/storage.bin
+
+      - name: Publish release (только для тегов v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: esp32/build/watch-os-full.bin
