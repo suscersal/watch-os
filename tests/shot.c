@@ -50,8 +50,8 @@ static void tap(int x, int y)
 }
 static void swipe_up(void)
 {
-    g_pt.x = 205; g_pt.y = 490; g_state = LV_INDEV_STATE_PRESSED; pump(3);   // от нижнего края, как свайп выхода
-    for (int y = 440; y >= 240; y -= 50) { g_pt.y = y; pump(2); }
+    g_pt.x = 205; g_pt.y = 440; g_state = LV_INDEV_STATE_PRESSED; pump(3);   // из нижней пятой части экрана (вне самого края), как свайп выхода
+    for (int y = 390; y >= 190; y -= 50) { g_pt.y = y; pump(2); }
     g_state = LV_INDEV_STATE_RELEASED; pump(40);
 }
 static void swipe_right(void)

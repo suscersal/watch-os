@@ -307,7 +307,8 @@ static void swipe_back_cb(lv_event_t *e)
 
 // Как на iPhone: свайп вверх от нижнего края выходит из приложения. Узкая прозрачная полоса внизу ловит только такие
 // свайпы (остальные жесты и нажатия её не касаются), а тонкая «планка» показывает, откуда тянуть.
-#define HOME_BAR_H 40
+#define HOME_BAR_H   96   // зона свайпа: нижние ~20% экрана, чтобы не нужно было попадать в самый край (на телефоне его перехватывает Android)
+#define HOME_PILL_UP 30   // планка приподнята от края
 static void home_swipe_cb(lv_event_t *e)
 {
     lv_indev_t *in = lv_indev_active();
@@ -335,7 +336,7 @@ static void add_home_bar(lv_obj_t *scr, lv_event_cb_t exit_cb)
     lv_obj_set_style_radius(pill, 3, 0);
     lv_obj_set_style_bg_color(pill, lv_color_hex(0x8E8E93), 0);
     lv_obj_set_style_bg_opa(pill, LV_OPA_50, 0);
-    lv_obj_align(pill, LV_ALIGN_BOTTOM_MID, 0, -8);
+    lv_obj_align(pill, LV_ALIGN_BOTTOM_MID, 0, -HOME_PILL_UP);
 }
 
 // Общая сборка экрана. root=true: главный экран приложения (название цветом приложения слева, время справа,
