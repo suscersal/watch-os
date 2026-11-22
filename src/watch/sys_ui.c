@@ -309,11 +309,25 @@ static void swipe_back_cb(lv_event_t *e)
 // свайпы (остальные жесты и нажатия её не касаются), а тонкая «планка» показывает, откуда тянуть.
 #define HOME_BAR_H   96   // зона свайпа: нижние ~20% экрана, чтобы не нужно было попадать в самый край (на телефоне его перехватывает Android)
 #define HOME_PILL_UP 30   // планка приподнята от края
+// Свой распознаватель вместо жеста LVGL: тот сбрасывает накопленное движение, если между двумя опросами мыши палец почти не
+// сдвинулся, и на «рваном» свайпе (Termux:X11, медленная рука) не срабатывает вовсе. Здесь важно только, куда ушёл палец.
+#define HOME_SWIPE_MIN 70    // на столько пикселей вверх надо уйти от точки нажатия
+static lv_point_t g_home_start;
+static bool       g_home_done;
+
 static void home_swipe_cb(lv_event_t *e)
 {
+    lv_event_code_t c = lv_event_get_code(e);
     lv_indev_t *in = lv_indev_active();
-    if (in && lv_indev_get_gesture_dir(in) == LV_DIR_TOP) {
-        lv_indev_wait_release(in);
+    if (!in) return;
+    lv_point_t p;
+    lv_indev_get_point(in, &p);
+    if (c == LV_EVENT_PRESSED) { g_home_start = p; g_home_done = false; return; }
+    if (c != LV_EVENT_PRESSING || g_home_done) return;
+    int dy = g_home_start.y - p.y, dx = p.x - g_home_start.x;
+    if (dy >= HOME_SWIPE_MIN && dy > (dx < 0 ? -dx : dx)) {      // вверх и скорее вертикально, чем вбок
+        g_home_done = true;
+        lv_indev_wait_release(in);                                // остаток движения не должен нажать кнопку под пальцем
         lv_event_cb_t cb = lv_event_get_user_data(e);
         if (cb) cb(e);
     }
@@ -325,10 +339,9 @@ static void add_home_bar(lv_obj_t *scr, lv_event_cb_t exit_cb)
     lv_obj_remove_style_all(zone);
     lv_obj_remove_flag(zone, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(zone, LV_OBJ_FLAG_FLOATING | LV_OBJ_FLAG_CLICKABLE);   // вне flex-раскладки экрана, поверх содержимого
-    lv_obj_remove_flag(zone, LV_OBJ_FLAG_GESTURE_BUBBLE);                  // LVGL шлёт жест первому родителю БЕЗ этого флага: пусть это будет сама полоса
     lv_obj_set_size(zone, lv_pct(100), HOME_BAR_H);
     lv_obj_align(zone, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_add_event_cb(zone, home_swipe_cb, LV_EVENT_GESTURE, exit_cb);
+    lv_obj_add_event_cb(zone, home_swipe_cb, LV_EVENT_ALL, exit_cb);
     lv_obj_t *pill = lv_obj_create(zone);
     lv_obj_remove_style_all(pill);
     lv_obj_remove_flag(pill, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
