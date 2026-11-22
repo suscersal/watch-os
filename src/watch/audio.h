@@ -25,6 +25,8 @@ typedef struct {
     bool (*rec_start)(const char *path);                       // писать WAV 16 кГц моно сюда (заголовок дописать при остановке)
     void (*rec_stop)(void);
     int  (*rec_level)(void);                                   // текущий уровень 0..100
+    void (*rec_pause)(void);                                   // необязательно: приостановить запись (звук не писать). Без этих двух пауза недоступна
+    void (*rec_resume)(void);
 } audio_hw_t;
 void audio_set_hw(const audio_hw_t *hw);
 
@@ -47,5 +49,9 @@ int      audio_get_volume(void);
 bool     audio_rec_start(const char *path);
 void     audio_rec_stop(void);       // дописывает заголовок WAV
 bool     audio_rec_active(void);
-uint32_t audio_rec_ms(void);
+bool     audio_rec_can_pause(void);  // пауза возможна (на ПК всегда; на плате - если заданы rec_pause и rec_resume)
+void     audio_rec_pause(void);      // время и запись замирают, уровень 0
+void     audio_rec_resume(void);
+bool     audio_rec_paused(void);
+uint32_t audio_rec_ms(void);         // длина записи без пауз
 int      audio_rec_level(void);      // 0..100

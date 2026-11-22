@@ -148,18 +148,26 @@ int      audio_get_volume(void)   { return P.volume; }
 
 // ---------- запись ----------
 static struct {
-    bool     active;
+    bool     active, paused;
     char     path[128];
-    uint32_t t0, written_ms, data_bytes;
+    uint32_t t0, written_ms, data_bytes, pause_t, paused_ms;
     lv_timer_t *sim;          // без платы: сами пишем тихий синтетический звук, чтобы получился настоящий WAV
     int      level;
     uint32_t phase;
 } R;
 
+static uint32_t rec_elapsed(void)       // сколько записано: без времени, проведённого на паузе
+{
+    if (!R.active) return 0;
+    uint32_t now = R.paused ? R.pause_t : lv_tick_get();
+    return now - R.t0 - R.paused_ms;
+}
+
 static void sim_tick(lv_timer_t *t)
 {
     LV_UNUSED(t);
-    uint32_t now_ms = lv_tick_get() - R.t0;
+    if (R.paused) return;
+    uint32_t now_ms = rec_elapsed();
     if (now_ms <= R.written_ms) return;
     uint32_t add_ms = now_ms - R.written_ms;
     if (add_ms > 500) add_ms = 500;                                   // за один раз не больше полусекунды
@@ -215,9 +223,29 @@ void audio_rec_stop(void)
 }
 
 bool     audio_rec_active(void) { return R.active; }
-uint32_t audio_rec_ms(void)     { return R.active ? lv_tick_get() - R.t0 : 0; }
+bool     audio_rec_paused(void) { return R.active && R.paused; }
+bool     audio_rec_can_pause(void) { return !g_hw || (g_hw->rec_pause && g_hw->rec_resume); }
+uint32_t audio_rec_ms(void)     { return rec_elapsed(); }
+
+void audio_rec_pause(void)
+{
+    if (!R.active || R.paused || !audio_rec_can_pause()) return;
+    if (R.sim) sim_tick(R.sim);                    // дописать всё до момента паузы
+    R.pause_t = lv_tick_get();
+    R.paused = true;
+    if (g_hw && g_hw->rec_pause) g_hw->rec_pause();
+}
+
+void audio_rec_resume(void)
+{
+    if (!R.active || !R.paused) return;
+    R.paused_ms += lv_tick_get() - R.pause_t;
+    R.paused = false;
+    if (g_hw && g_hw->rec_resume) g_hw->rec_resume();
+}
+
 int      audio_rec_level(void)
 {
-    if (!R.active) return 0;
+    if (!R.active || R.paused) return 0;
     return (g_hw && g_hw->rec_level) ? g_hw->rec_level() : R.level;
 }

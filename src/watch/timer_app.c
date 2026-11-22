@@ -16,17 +16,27 @@
 
 typedef enum { T_IDLE, T_RUN, T_PAUSE, T_DONE } tstate_t;
 
-static const uint32_t presets_ms[] = { 10000, 30000, 60000, 180000, 300000, 600000 };
-static const char *const preset_names[] = { "10 сек", "30 сек", "1 мин", "3 мин", "5 мин", "10 мин" };
-#define NPRESET 6
+#define MAX_MIN   99          // барабан минут: 0..99
+#define DEF_MS    60000u
+
+// длительность, выбранная пользователем; помним её между запусками приложения
+static uint32_t g_total_ms = DEF_MS;
 
 // remain_ms - сколько оставалось в момент t0 (для T_RUN); для остальных состояний - текущий остаток
-static struct { int preset; tstate_t st; uint32_t remain_ms, t0; } T;
+static struct { tstate_t st; uint32_t remain_ms, t0; } T;
 
 static lv_obj_t *g_launcher, *scr, *frame, *right_lbl, *cap_lbl, *time_lbl, *status_lbl, *btn_reset, *btn_main, *main_lbl;
 static lv_timer_t *tick;
 
-static uint32_t total_ms(void) { return presets_ms[T.preset]; }
+static uint32_t total_ms(void) { return g_total_ms; }
+
+static void fmt_len(char *b, size_t n, uint32_t ms)       // "5 мин", "1 мин 30 с", "45 сек"
+{
+    unsigned m = ms / 60000, sec = ms / 1000 % 60;
+    if (m && sec) snprintf(b, n, "%u мин %u с", m, sec);
+    else if (m)   snprintf(b, n, "%u мин", m);
+    else          snprintf(b, n, "%u сек", sec);
+}
 
 static uint32_t remaining(void)
 {
@@ -112,11 +122,13 @@ static void refresh(void)
     char b[12];
     snprintf(b, sizeof b, "%02u:%02u", (unsigned)(secs / 60), (unsigned)(secs % 60));
     lv_label_set_text(time_lbl, b);
-    lv_label_set_text(right_lbl, preset_names[T.preset]);
+    char len[24];
+    fmt_len(len, sizeof len, total_ms());
+    lv_label_set_text(right_lbl, len);
 
     const char *cap = "ОСТАЛОСЬ", *status = "Идёт отсчёт", *main_txt = "Пауза", *reset_txt = "Сброс";
     switch (T.st) {
-    case T_IDLE:  cap = "УСТАНОВЛЕНО"; status = "Нажмите на длительность"; main_txt = "Старт"; break;
+    case T_IDLE:  cap = "УСТАНОВЛЕНО"; status = "Нажмите на время"; main_txt = "Старт"; break;
     case T_RUN:   break;
     case T_PAUSE: status = "Пауза"; main_txt = "Продолжить"; break;
     case T_DONE:  cap = "ГОТОВО"; status = "Время вышло"; main_txt = "Заново"; break;
@@ -158,14 +170,125 @@ static void reset_cb(lv_event_t *e)
     refresh();
 }
 
-static void duration_cb(lv_event_t *e)          // нажатие на длительность вверху: следующая из списка (только пока не запущено)
+static lv_obj_t *label(lv_obj_t *parent, const char *text, const lv_font_t *font, uint32_t color, int y, int w);
+
+// ---------- выбор времени ----------
+static lv_obj_t *pk_scr, *pk_min, *pk_sec;
+
+static void picker_close(void)
+{
+    lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);   // экран выбора удаляется
+    pk_scr = pk_min = pk_sec = NULL;
+    refresh();
+}
+
+static void picker_back_cb(lv_event_t *e) { LV_UNUSED(e); picker_close(); }
+
+static void picker_set(uint32_t ms)
+{
+    unsigned m = ms / 60000, sec = ms / 1000 % 60;
+    if (m > MAX_MIN) m = MAX_MIN;
+    lv_roller_set_selected(pk_min, m, LV_ANIM_OFF);
+    lv_roller_set_selected(pk_sec, sec, LV_ANIM_OFF);
+}
+
+static void picker_done_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    uint32_t ms = (lv_roller_get_selected(pk_min) * 60u + lv_roller_get_selected(pk_sec)) * 1000u;
+    if (ms == 0) { sys_toast("Выберите время"); return; }
+    g_total_ms = ms;
+    T.st = T_IDLE;
+    T.remain_ms = ms;
+    picker_close();
+}
+
+static void picker_chip_cb(lv_event_t *e)
+{
+    picker_set((uint32_t)(uintptr_t)lv_event_get_user_data(e));
+}
+
+static lv_obj_t *picker_roller(lv_obj_t *body, int x, int count)
+{
+    static char opts[300 + 1];                       // "00\n01\n...": до 100 значений по 3 символа
+    int n = 0;
+    for (int i = 0; i < count; i++) n += snprintf(opts + n, sizeof opts - (size_t)n, i ? "\n%02d" : "%02d", i);
+    lv_obj_t *r = lv_roller_create(body);
+    lv_roller_set_options(r, opts, LV_ROLLER_MODE_INFINITE);
+    lv_roller_set_visible_row_count(r, 3);
+    lv_obj_set_width(r, 140);
+    lv_obj_set_height(r, 172);
+    lv_obj_set_pos(r, x, 24);
+    lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(r, 0, 0);
+    lv_obj_set_style_text_font(r, WATCH_FONT_LARGE, 0);
+    lv_obj_set_style_text_color(r, lv_color_hex(0x5A5A5E), 0);
+    lv_obj_set_style_text_line_space(r, 18, 0);
+    lv_obj_set_style_bg_color(r, lv_color_hex(WS_CARD), LV_PART_SELECTED);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_PART_SELECTED);
+    lv_obj_set_style_radius(r, 20, LV_PART_SELECTED);
+    lv_obj_set_style_text_font(r, WATCH_FONT_BOLD, LV_PART_SELECTED);
+    lv_obj_set_style_text_color(r, lv_color_white(), LV_PART_SELECTED);
+    return r;
+}
+
+static void picker_open(void)
+{
+    lv_obj_t *body;
+    pk_scr = sys_screen_create("Время", picker_back_cb, &body);
+    lv_obj_remove_flag(body, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_layout(body, LV_LAYOUT_NONE);
+    lv_obj_set_style_pad_all(body, 0, 0);
+
+    lv_obj_t *l1 = label(body, "МИНУТЫ", WATCH_FONT_SMALL, 0x8E8E93, 0, 140);
+    lv_obj_set_pos(l1, 45, 0);
+    lv_obj_t *l2 = label(body, "СЕКУНДЫ", WATCH_FONT_SMALL, 0x8E8E93, 0, 140);
+    lv_obj_set_pos(l2, 225, 0);
+    pk_min = picker_roller(body, 45, MAX_MIN + 1);
+    pk_sec = picker_roller(body, 225, 60);
+    picker_set(total_ms());
+
+    static const struct { const char *name; uint32_t ms; } chips[4] = {
+        { "30 с", 30000 }, { "1 мин", 60000 }, { "5 мин", 300000 }, { "10 мин", 600000 } };
+    for (int i = 0; i < 4; i++) {
+        lv_obj_t *c = lv_button_create(body);
+        lv_obj_set_size(c, 84, 46);
+        lv_obj_set_pos(c, 20 + i * 90, 206);
+        lv_obj_set_style_radius(c, 23, 0);
+        lv_obj_set_style_shadow_width(c, 0, 0);
+        lv_obj_set_style_pad_all(c, 0, 0);
+        lv_obj_set_style_bg_color(c, lv_color_hex(WS_FILL), 0);
+        lv_obj_set_style_bg_color(c, lv_color_hex(WS_FILL2), LV_STATE_PRESSED);
+        lv_obj_t *t = lv_label_create(c);
+        lv_label_set_text(t, chips[i].name);
+        lv_obj_set_style_text_font(t, WATCH_FONT_BODY, 0);
+        lv_obj_set_style_text_color(t, lv_color_white(), 0);
+        lv_obj_center(t);
+        lv_obj_add_event_cb(c, picker_chip_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)chips[i].ms);
+    }
+
+    lv_obj_t *ok = lv_button_create(body);
+    lv_obj_set_size(ok, 330, 65);
+    lv_obj_set_pos(ok, 40, 276);
+    lv_obj_set_style_radius(ok, 33, 0);
+    lv_obj_set_style_shadow_width(ok, 0, 0);
+    lv_obj_set_style_bg_color(ok, lv_color_hex(ORANGE), 0);
+    lv_obj_set_style_bg_color(ok, lv_color_hex(0xC66A00), LV_STATE_PRESSED);
+    lv_obj_t *ol = lv_label_create(ok);
+    lv_label_set_text(ol, "Готово");
+    lv_obj_set_style_text_font(ol, WATCH_FONT_BOLD_S, 0);
+    lv_obj_set_style_text_color(ol, lv_color_black(), 0);
+    lv_obj_center(ol);
+    lv_obj_add_event_cb(ok, picker_done_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_screen_load_anim(pk_scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);     // экран таймера остаётся
+}
+
+static void duration_cb(lv_event_t *e)          // нажатие на время: выбрать длительность (только пока не запущено)
 {
     LV_UNUSED(e);
     if (T.st != T_IDLE && T.st != T_DONE) return;
-    T.preset = (T.preset + 1) % NPRESET;
-    T.st = T_IDLE;
-    T.remain_ms = total_ms();
-    refresh();
+    picker_open();
 }
 
 static void exit_cb(lv_event_t *e)
@@ -227,6 +350,9 @@ void timer_open(lv_obj_t *launcher)
     cap_lbl = label(body, "", WATCH_FONT_SMALL, 0x8E8E93, 71, 300);
     lv_obj_set_style_text_letter_space(cap_lbl, 2, 0);
     time_lbl = label(body, "", WATCH_FONT_DIGITS, 0xFFFFFF, 110, 380);
+    lv_obj_add_flag(time_lbl, LV_OBJ_FLAG_CLICKABLE);                       // нажатие на цифры тоже открывает выбор времени
+    lv_obj_set_ext_click_area(time_lbl, 10);
+    lv_obj_add_event_cb(time_lbl, duration_cb, LV_EVENT_CLICKED, NULL);
     status_lbl = label(body, "", WATCH_FONT_BODY, 0xA4A5AA, 213, 340);
     btn_reset = pill(body, 39, 112, WS_FILL, 0xFFFFFF, reset_cb, NULL);
     btn_main  = pill(body, 163, 206, ORANGE, 0x000000, main_cb, &main_lbl);

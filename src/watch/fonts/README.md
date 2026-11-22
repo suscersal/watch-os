@@ -19,3 +19,7 @@
     lv_font_conv --bpp 4 --size 64 --no-compress --font $F/inter-latin-700-normal.woff \
       -r "0x20,0x25,0x2B,0x2D,0x2E,0x30-0x3A,0x2212" --format lvgl --lv-font-name watch_font_d64 \
       --lv-include "lvgl/lvgl.h" --force-fast-kern-format -o watch_font_d64.c
+    # цифры 40 px (диктофон по макету Figma)
+    lv_font_conv --bpp 4 --size 40 --no-compress --font $F/inter-latin-500-normal.woff \
+      -r "0x20,0x2E,0x30-0x3A" --format lvgl --lv-font-name watch_font_d40 \
+      --lv-include "lvgl/lvgl.h" --force-fast-kern-format -o watch_font_d40.c
