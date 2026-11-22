@@ -583,7 +583,7 @@ static void exit_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
     leave_main();
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);
 }
 
 static void list_open_cb(lv_event_t *e)
@@ -660,7 +660,8 @@ static void build_main(lv_screen_load_anim_t anim, rstate_t first)
     tick = lv_timer_create(tick_cb, 100, NULL);
     g_prog = 0;
     apply_state(first);
-    lv_screen_load_anim(scr_main, anim, 200, 0, true);
+    // Лаунчер удалять нельзя: в него возвращает exit_cb (g_launcher). Свои прежние экраны (список записей) удаляем.
+    lv_screen_load_anim(scr_main, anim, 200, 0, lv_screen_active() != g_launcher);
 }
 
 // ---------- список записей ----------

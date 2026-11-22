@@ -13,7 +13,7 @@ static void list_deleted_cb(lv_event_t *e) { LV_UNUSED(e); g_list_scr = g_list_b
 static void back_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);
 }
 
 static void detail_back_cb(lv_event_t *e)

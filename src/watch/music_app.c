@@ -328,7 +328,7 @@ static void exit_cb(lv_event_t *e)
     audio_stop();
     if (p_timer) { lv_timer_delete(p_timer); p_timer = NULL; }
     scr_player = NULL;
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);
 }
 
 void music_open(lv_obj_t *launcher)

@@ -296,7 +296,7 @@ static void exit_cb(lv_event_t *e)
     LV_UNUSED(e);
     if (tick) { lv_timer_delete(tick); tick = NULL; }
     scr = NULL;
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);
 }
 
 static lv_obj_t *label(lv_obj_t *parent, const char *text, const lv_font_t *font, uint32_t color, int y, int w)

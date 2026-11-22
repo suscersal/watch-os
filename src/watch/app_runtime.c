@@ -101,7 +101,7 @@ void app_nav_back(app_run_t *r)
     // первый экран: выходим в лаунчер, экран приложения удаляется
     sys_confirm_close();
     g_run = NULL;
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);
     lv_timer_t *t = lv_timer_create(free_run_cb, 500, r);
     lv_timer_set_repeat_count(t, 1);
 }

@@ -232,7 +232,7 @@ static void grid_gone_cb(lv_event_t *e) { LV_UNUSED(e); grid_scr = grid_body = N
 static void grid_back_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);   // экран галереи удаляется
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);   // экран галереи удаляется
 }
 
 void gallery_open(lv_obj_t *launcher)

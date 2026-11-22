@@ -273,7 +273,7 @@ static void back_cb(lv_event_t *e)
     sys_keyboard_hide();
     sys_confirm_close();
     if (pending_pkg) { cJSON_Delete(pending_pkg); pending_pkg = NULL; }
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);   // экран установщика удаляется
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);   // экран установщика удаляется
 }
 
 void installer_open(lv_obj_t *launcher)

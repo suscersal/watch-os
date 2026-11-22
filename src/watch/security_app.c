@@ -26,7 +26,7 @@ static void main_deleted_cb(lv_event_t *e) { LV_UNUSED(e); main_scr = main_body 
 static void main_back_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
-    lv_screen_load_anim(g_launcher, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);   // экран Security удаляется
+    lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);   // экран Security удаляется
 }
 
 // ---------- сценарий ввода PIN ----------

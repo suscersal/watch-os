@@ -28,3 +28,7 @@ bool sys_screen_exit(lv_obj_t *scr);
 lv_obj_t *sys_screen_create_root(const char *title, lv_event_cb_t exit_cb, lv_obj_t **body_out);
 // То же, но справа вместо времени свой текст (метка возвращается в right_out, чтобы менять текст).
 lv_obj_t *sys_screen_create_root_text(const char *title, lv_event_cb_t exit_cb, lv_obj_t **body_out, const char *right_text, lv_obj_t **right_out);
+
+// Анимация выхода из приложения в лаунчер: при выходе свайпом вверх экран уезжает вверх (как на iPhone), иначе уходит вправо.
+// Вызывать прямо в обработчике выхода: lv_screen_load_anim(g_launcher, sys_exit_anim(), 200, 0, true);
+lv_screen_load_anim_t sys_exit_anim(void);

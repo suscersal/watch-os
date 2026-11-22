@@ -312,6 +312,7 @@ static void swipe_back_cb(lv_event_t *e)
 // Свой распознаватель вместо жеста LVGL: тот сбрасывает накопленное движение, если между двумя опросами мыши палец почти не
 // сдвинулся, и на «рваном» свайпе (Termux:X11, медленная рука) не срабатывает вовсе. Здесь важно только, куда ушёл палец.
 #define HOME_SWIPE_MIN 70    // на столько пикселей вверх надо уйти от точки нажатия
+static bool       g_exit_up;       // идёт выход свайпом вверх: sys_exit_anim() вернёт «вверх»
 static lv_point_t g_home_start;
 static bool       g_home_done;
 
@@ -329,8 +330,15 @@ static void home_swipe_cb(lv_event_t *e)
         g_home_done = true;
         lv_indev_wait_release(in);                                // остаток движения не должен нажать кнопку под пальцем
         lv_event_cb_t cb = lv_event_get_user_data(e);
-        if (cb) cb(e);
+        g_exit_up = true;
+        if (cb) cb(e);                                            // анимацию выбирают внутри cb, синхронно
+        g_exit_up = false;
     }
+}
+
+lv_screen_load_anim_t sys_exit_anim(void)
+{
+    return g_exit_up ? LV_SCREEN_LOAD_ANIM_OUT_TOP : LV_SCREEN_LOAD_ANIM_MOVE_RIGHT;
 }
 
 static void add_home_bar(lv_obj_t *scr, lv_event_cb_t exit_cb)
