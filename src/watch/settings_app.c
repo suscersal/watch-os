@@ -235,15 +235,6 @@ static void open_wifi_cb(lv_event_t *e)
     push(g_main_scr, w_scr);
 }
 
-void settings_open_wifi_from(lv_obj_t *parent)
-{
-    lv_obj_t *prev = g_main_scr;
-    g_depth = 0;
-    g_main_scr = parent;       // push() запомнит parent как экран, на который вернёт "назад"
-    open_wifi_cb(NULL);
-    g_main_scr = prev;
-}
-
 // ---------- часовой пояс ----------
 static const int16_t tz_list[] = {   // минуты от UTC, по возрастанию
     -720, -660, -600, -540, -480, -420, -360, -300, -240, -210, -180, -120, -60, 0, 60, 120, 180, 210, 240, 270, 300,

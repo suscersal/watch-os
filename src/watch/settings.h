@@ -7,10 +7,6 @@
 
 void settings_init(const char *data_root);
 
-// Первая настройка (мастер) пройдена: больше не показывается при запуске.
-bool settings_setup_done(void);
-void settings_set_setup_done(bool done);
-
 // Часовой пояс: auto - берём пояс, который прислал телефон; иначе фиксированное смещение в минутах.
 // tz_min - последнее известное смещение (пояс телефона или выбранный вручную).
 bool settings_tz_auto(void);

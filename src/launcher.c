@@ -24,9 +24,10 @@
 
 #define SCR_W    410
 #define SCR_H    502
-#define ICON     92     // диаметр иконки в покое
-#define PITCH_X  100    // шаг по горизонтали
-#define PITCH_Y  87     // шаг по вертикали (~ PITCH_X * 0.866 - сотовая сетка)
+#define ICON     112    // диаметр иконки в покое
+#define PITCH_X  110    // шаг по горизонтали
+#define PITCH_Y  95     // шаг по вертикали (~ PITCH_X * 0.866 - сотовая сетка)
+#define ICON_GLYPH_SCALE 340   // масштаб глифа внутри иконки, 256 = 100%
 #define MIN_TOP  30     // отступ сверху, если сетка не помещается и прокручивается
 
 // Эффект "рыбий глаз" как на Apple Watch: иконка у центра экрана крупнее, к краям уменьшается
@@ -171,6 +172,9 @@ static void build_grid(void)
             lv_label_set_text(l, app_icon_symbol(app_manager_get(i)->icon));
             lv_obj_set_style_text_color(l, lv_color_white(), 0);
             lv_obj_set_style_text_font(l, WATCH_FONT_LARGE, 0);
+            lv_obj_set_style_transform_pivot_x(l, lv_pct(50), 0);   // глиф крупнее, чем шрифт 28: масштаб вокруг центра
+            lv_obj_set_style_transform_pivot_y(l, lv_pct(50), 0);
+            lv_obj_set_style_transform_scale(l, ICON_GLYPH_SCALE, 0);
             lv_obj_center(l);
         }
         row++;

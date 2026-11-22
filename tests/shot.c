@@ -11,7 +11,6 @@
 //   scroll=<dy>       прокрутить сетку лаунчера на dy пикселей
 //   tapout            нажать вне клавиатуры и поля (клавиатура должна закрыться)
 //   face              показать циферблат
-//   wizard            показать мастер первой настройки (дальше click=Continue, click=Skip и т.д.)
 //   time=<epoch>,<tz> задать время (epoch UTC, пояс в минутах), чтобы снимок не зависел от часов компьютера
 //   msg=<app>|<title>|<text>   добавить уведомление (как будто пришло с телефона)
 //   swipeup           свайп вверх от нижнего края (выход из приложения, как на iPhone)
@@ -23,7 +22,6 @@
 #include "watch/app_runtime.h"
 #include "watch/clock.h"
 #include "watch/messages.h"
-#include "watch/setup_wizard.h"
 #include "watch/sys_ui.h"
 #include "watch/watchface.h"
 #include "watch/ws_style.h"
@@ -203,9 +201,6 @@ int main(int argc, char **argv)
             lv_obj_t *cont = lv_obj_get_child(launcher, 0);
             lv_obj_scroll_by(cont, 0, -atoi(s + 7), LV_ANIM_OFF);
             pump(20);
-        } else if (strcmp(s, "wizard") == 0) {
-            setup_wizard_show(launcher);
-            pump(40);
         } else if (strcmp(s, "face") == 0) {
             watchface_show(launcher);
             pump(30);

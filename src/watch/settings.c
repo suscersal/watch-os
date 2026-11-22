@@ -14,7 +14,6 @@ static struct {
     char  ssid[SETTINGS_SSID_MAX], pass[SETTINGS_PASS_MAX];
     bool  notify_on;
     char  notify_code[7];
-    bool  setup_done;
 } S = { .tz_auto = true };
 
 static char g_path[96] = "data/settings.json";
@@ -30,7 +29,6 @@ static void save(void)
     cJSON_AddStringToObject(o, "wifi_pass", S.pass);
     cJSON_AddBoolToObject(o, "notify_on", S.notify_on);
     cJSON_AddStringToObject(o, "notify_code", S.notify_code);
-    cJSON_AddBoolToObject(o, "setup_done", S.setup_done);
     char *txt = cJSON_PrintUnformatted(o);
     if (txt) { fs_write_file(g_path, txt, strlen(txt)); free(txt); }
     cJSON_Delete(o);
@@ -69,7 +67,6 @@ void settings_init(const char *data_root)
     copy_str(S.pass, sizeof S.pass, cJSON_GetObjectItemCaseSensitive(o, "wifi_pass"));
     if (cJSON_IsBool(v = cJSON_GetObjectItemCaseSensitive(o, "notify_on"))) S.notify_on = cJSON_IsTrue(v);
     copy_str(S.notify_code, sizeof S.notify_code, cJSON_GetObjectItemCaseSensitive(o, "notify_code"));
-    if (cJSON_IsBool(v = cJSON_GetObjectItemCaseSensitive(o, "setup_done"))) S.setup_done = cJSON_IsTrue(v);
     if (!code_ok(S.notify_code)) { S.notify_code[0] = '\0'; S.notify_on = false; }
     cJSON_Delete(o);
 }
@@ -129,14 +126,6 @@ static void make_code(void)
     if (!plat_random(r, sizeof r)) { for (int i = 0; i < 6; i++) r[i] = (uint8_t)(i * 37 + 11); }   // запасной вариант, не должен срабатывать
     for (int i = 0; i < 6; i++) S.notify_code[i] = (char)('0' + r[i] % 10);
     S.notify_code[6] = '\0';
-}
-
-bool settings_setup_done(void) { return S.setup_done; }
-
-void settings_set_setup_done(bool done)
-{
-    S.setup_done = done;
-    save();
 }
 
 bool        settings_notify_on(void)   { return S.notify_on; }
