@@ -8,6 +8,9 @@
 #include "watch/storage.h"
 #include "watch/sync_net.h"
 #include "watch/power.h"
+#include "watch/ws_style.h"
+#include "watch/music_app.h"
+#include "watch/recorder_app.h"
 #include "watch/auth.h"
 #include "watch/lock_screen.h"
 #include "watch/photos.h"
@@ -72,6 +75,7 @@ static void scroll_cb(lv_event_t *e)
 static void app_cb(lv_event_t *e)
 {
     const app_info_t *a = lv_event_get_user_data(e);
+    ws_set_accent(a->color);                 // цвет приложения: заголовок экрана, ползунки, шапка таблиц
     if (a->builtin) a->builtin(launcher);    // системное приложение (Install)
     else            app_runtime_launch(a, launcher);
 }
@@ -90,7 +94,9 @@ void watch_launcher_create(void)
     settings_init(WATCH_ROOT "data");        // часовой пояс, Wi-Fi, ключ API, уведомления
     auth_init(WATCH_ROOT "data");
     storage_init(WATCH_ROOT "data");         // хранилище приложений; папка data/ приложениям недоступна
-    power_init(WATCH_ROOT "data");           // затемнение и выключение экрана при бездействии
+    power_init(WATCH_ROOT "data");
+    music_init(WATCH_ROOT "data");           // музыка: data/music/*.wav
+    recorder_init(WATCH_ROOT "data");        // записи: data/rec
     photos_init(WATCH_ROOT "data/photos");   // фото с телефона (Gallery)
     app_manager_scan(WATCH_ROOT "apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
     build_grid();
@@ -170,7 +176,11 @@ static void build_grid(void)
         row++;
     }
 
+    // время в правом верхнем углу, как на Apple Watch (не прокручивается вместе с сеткой)
+    lv_obj_t *tm = ws_time_label(launcher);
+    lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -16, 8);
+
     lv_obj_update_layout(cont);
     fisheye_update(cont);
-    statusbar_create(launcher, true);      // время, Wi-Fi, батарея поверх сетки
+    statusbar_create(launcher, false);     // Wi-Fi и батарея; время в лаунчере уже рисует его собственная метка
 }

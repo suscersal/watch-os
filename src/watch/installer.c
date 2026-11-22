@@ -1,4 +1,5 @@
 #include "installer.h"
+#include "ws_style.h"
 #include "app_manager.h"
 #include "fs.h"
 #include "net.h"
@@ -279,7 +280,7 @@ void installer_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
     lv_obj_t *body;
-    lv_obj_t *scr = sys_screen_create("Install app", back_cb, &body);
+    lv_obj_t *scr = sys_screen_create_root("Install app", back_cb, &body);
     lv_obj_add_event_cb(scr, screen_deleted_cb, LV_EVENT_DELETE, NULL);
 
     lv_obj_t *hint = lv_label_create(body);
@@ -293,9 +294,9 @@ void installer_open(lv_obj_t *launcher)
     lv_textarea_set_max_length(url_ta, 200);
     lv_textarea_set_placeholder_text(url_ta, "https://...");
     lv_obj_set_width(url_ta, lv_pct(100));
-    lv_obj_set_style_bg_color(url_ta, lv_color_hex(0x1F2937), 0);
+    lv_obj_set_style_bg_color(url_ta, lv_color_hex(WS_CARD), 0);
     lv_obj_set_style_text_color(url_ta, lv_color_white(), 0);
-    lv_obj_set_style_border_color(url_ta, lv_color_hex(0x374151), 0);
+    lv_obj_set_style_border_width(url_ta, 0, 0);
     lv_obj_set_style_radius(url_ta, 12, 0);
     lv_obj_add_event_cb(url_ta, input_cb, LV_EVENT_ALL, NULL);
 

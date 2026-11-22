@@ -1,4 +1,5 @@
 #include "security_app.h"
+#include "ws_style.h"
 #include "auth.h"
 #include "lock_screen.h"
 #include "pinpad.h"
@@ -123,7 +124,7 @@ static void refresh_main(void)
     lv_label_set_text(st, auth_has_pin() ? "PIN is set" : "PIN is not set");
     lv_obj_set_style_text_color(st, lv_color_hex(auth_has_pin() ? 0x22C55E : 0x9CA3AF), 0);
 
-    add_button(auth_has_pin() ? "Change PIN" : "Set PIN", 0x3B82F6, set_cb);
+    add_button(auth_has_pin() ? "Change PIN" : "Set PIN", WS_BLUE, set_cb);
     if (auth_has_pin()) {
         add_button("Lock now", 0x6B7280, lock_cb);
         add_button("Remove PIN", 0xEF4444, remove_cb);
@@ -144,7 +145,7 @@ static void refresh_main(void)
 void security_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    main_scr = sys_screen_create("Security", main_back_cb, &main_body);
+    main_scr = sys_screen_create_root("Security", main_back_cb, &main_body);
     lv_obj_add_event_cb(main_scr, main_deleted_cb, LV_EVENT_DELETE, NULL);
     refresh_main();
     lv_screen_load_anim(main_scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);     // лаунчер не удаляем

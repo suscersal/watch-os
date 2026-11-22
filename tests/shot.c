@@ -13,7 +13,9 @@
 //   face              показать циферблат
 //   time=<epoch>,<tz> задать время (epoch UTC, пояс в минутах), чтобы снимок не зависел от часов компьютера
 //   msg=<app>|<title>|<text>   добавить уведомление (как будто пришло с телефона)
-//   wait=<ms>         прокрутить время (анимации, таймеры)
+//   swipe             свайп вправо (выход из приложения; на лаунчере ничего не делает)
+//   tap=<x>,<y>       настоящее нажатие в точку экрана (410x502)
+//   wait=<мс>         подождать (время виртуальное): идёт запись, воспроизведение, таймеры
 #include "watch/lvgl_inc.h"
 #include "watch/app_manager.h"
 #include "watch/app_runtime.h"
@@ -21,6 +23,7 @@
 #include "watch/messages.h"
 #include "watch/sys_ui.h"
 #include "watch/watchface.h"
+#include "watch/ws_style.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +37,22 @@ static uint32_t g_ms;
 static uint32_t tick_cb(void) { return g_ms; }
 static void flush_cb(lv_display_t *d, const lv_area_t *a, uint8_t *px) { LV_UNUSED(a); LV_UNUSED(px); lv_display_flush_ready(d); }
 static void pump(int n) { for (int i = 0; i < n; i++) { g_ms += 20; lv_timer_handler(); } }
+
+// Виртуальный палец: настоящие нажатия и свайпы проходят через индев, как на сенсоре часов.
+static lv_point_t g_pt;
+static lv_indev_state_t g_state = LV_INDEV_STATE_RELEASED;
+static void ptr_read(lv_indev_t *i, lv_indev_data_t *dd) { LV_UNUSED(i); dd->point = g_pt; dd->state = g_state; }
+static void tap(int x, int y)
+{
+    g_pt.x = x; g_pt.y = y; g_state = LV_INDEV_STATE_PRESSED; pump(4);
+    g_state = LV_INDEV_STATE_RELEASED; pump(4);
+}
+static void swipe_right(void)
+{
+    g_pt.x = 4; g_pt.y = 250; g_state = LV_INDEV_STATE_PRESSED; pump(3);   // от левого края, как свайп "назад"
+    for (int x = 70; x <= 330; x += 52) { g_pt.x = x; pump(2); }
+    g_state = LV_INDEV_STATE_RELEASED; pump(40);
+}
 
 // ---- минимальный PNG без сжатия (stored-блоки deflate), чтобы не зависеть от zlib ----
 static uint32_t crc_tab[256];
@@ -136,6 +155,9 @@ int main(int argc, char **argv)
     static uint8_t buf[W * H * 4];
     lv_display_set_buffers(d, buf, NULL, sizeof buf, LV_DISPLAY_RENDER_MODE_FULL);
     lv_display_set_flush_cb(d, flush_cb);
+    lv_indev_t *ptr = lv_indev_create();
+    lv_indev_set_type(ptr, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(ptr, ptr_read);
 
     watch_launcher_create();
     pump(40);
@@ -145,15 +167,17 @@ int main(int argc, char **argv)
         const char *s = argv[i];
         if (strcmp(s, "launcher") == 0) {
             for (int k = 0; k < 8 && lv_screen_active() != launcher; k++) {
-                nfound = 0; collect(lv_screen_active(), &lv_button_class);
-                if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);
-                pump(30);
+                swipe_right();
+                if (lv_screen_active() == launcher) break;
+                lv_obj_t *back = find_button(lv_screen_active(), LV_SYMBOL_LEFT);   // вложенный экран: круглая кнопка "назад"
+                if (back) { lv_obj_send_event(back, LV_EVENT_CLICKED, NULL); pump(30); }
             }
         } else if (strncmp(s, "app=", 4) == 0) {
             const app_info_t *a = NULL;
             for (size_t k = 0; k < app_manager_count(); k++)
                 if (strcmp(app_manager_get(k)->name, s + 4) == 0) a = app_manager_get(k);
             if (!a) { fprintf(stderr, "no app %s\n", s + 4); return 1; }
+            ws_set_accent(a->color);
             if (a->builtin) a->builtin(launcher); else app_runtime_launch(a, launcher);
             pump(40);
         } else if (strncmp(s, "click=", 6) == 0) {
@@ -186,8 +210,14 @@ int main(int argc, char **argv)
             *t = *x = '\0';
             messages_add((uint32_t)i, 0, tmp, t + 1, x + 1);
             pump(30);
+        } else if (strcmp(s, "swipe") == 0) {
+            swipe_right();
+        } else if (strncmp(s, "tap=", 4) == 0) {
+            int x, y;
+            if (sscanf(s + 4, "%d,%d", &x, &y) != 2) { fprintf(stderr, "bad tap\n"); return 2; }
+            tap(x, y);
         } else if (strncmp(s, "wait=", 5) == 0) {
-            pump(atoi(s + 5) / 20 + 1);
+            pump(atoi(s + 5) / 20);
         } else if (strcmp(s, "tapout") == 0) {
             sys_keyboard_press_outside(lv_screen_active());
             pump(20);

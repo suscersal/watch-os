@@ -370,7 +370,7 @@ int main(int argc, char **argv)
     CHECK(gallery_viewer_index() == 0 && find_label(lv_screen_active(), "1 / 1") != NULL && is_color(205, 251, 255, 255, 0), "viewer moved to the remaining photo");
     press(lv_screen_active(), LV_SYMBOL_LEFT); run(400);
     CHECK(is_color(72, 128, 255, 0, 255) && !is_color(200, 128, 230, 0, 0), "back to the grid: only B left");
-    press(lv_screen_active(), LV_SYMBOL_LEFT); run(400);
+    sys_screen_exit(lv_screen_active()); run(400);   // главный экран приложения: выход как свайпом
 
     // ============ TCP + клиент на Python ============
     memset(ev_count, 0, sizeof ev_count);
@@ -407,7 +407,7 @@ int main(int argc, char **argv)
         if (is_color(x, y, 255, 128, 0)) orange++;
     }
     CHECK(cyan == 1 && orange == 1, "thumbnails of both TCP photos are visible (cyan portrait, orange landscape)");
-    press(lv_screen_active(), LV_SYMBOL_LEFT); run(400);
+    sys_screen_exit(lv_screen_active()); run(400);   // главный экран приложения: выход как свайпом
 
     sync_net_stop();
     CHECK(!sync_net_running(), "server stopped");
@@ -422,7 +422,7 @@ int main(int argc, char **argv)
     { char c3[16]; const char *c = sync_net_code(); snprintf(c3, sizeof c3, "%c%c%c %c%c%c", c[0], c[1], c[2], c[3], c[4], c[5]);
       CHECK(find_label(lv_screen_active(), c3) != NULL, "pairing code shown as 'NNN NNN'");
       CHECK(find_label(lv_screen_active(), "Waiting for phone") != NULL, "status: waiting for phone"); }
-    press(lv_screen_active(), LV_SYMBOL_LEFT); run(400);
+    sys_screen_exit(lv_screen_active()); run(400);   // главный экран приложения: выход как свайпом
     CHECK(!sync_net_running(), "leaving Sync screen stops the server");
 
     CHECK(auth_set_pin("1234"), "PIN set for the lock screen clock test");

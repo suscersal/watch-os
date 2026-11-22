@@ -1,5 +1,6 @@
 #include "sys_ui.h"
 #include "watch_fonts.h"
+#include "ws_style.h"
 #include <string.h>
 
 static lv_obj_t   *kb;
@@ -118,7 +119,17 @@ static void kb_create(void)
     lv_obj_add_event_cb(kb, kb_key_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(kb, kb_cb, LV_EVENT_ALL, NULL);
     lv_obj_set_size(kb, lv_pct(100), lv_pct(45));
-    lv_obj_set_style_text_font(kb, WATCH_FONT_BODY, LV_PART_ITEMS);   // тема задаёт свой шрифт кнопкам: без этого кириллица не отрисуется
+    lv_obj_set_style_text_font(kb, WATCH_FONT_BODY, LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(kb, lv_color_hex(WS_BG), 0);
+    lv_obj_set_style_pad_all(kb, 6, 0);
+    lv_obj_set_style_pad_gap(kb, 6, 0);
+    lv_obj_set_style_border_width(kb, 0, 0);
+    lv_obj_set_style_bg_color(kb, lv_color_hex(WS_FILL), LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(kb, lv_color_hex(WS_FILL2), LV_PART_ITEMS | LV_STATE_PRESSED);
+    lv_obj_set_style_text_color(kb, lv_color_white(), LV_PART_ITEMS);
+    lv_obj_set_style_radius(kb, 12, LV_PART_ITEMS);
+    lv_obj_set_style_shadow_width(kb, 0, LV_PART_ITEMS);
+    lv_obj_set_style_border_width(kb, 0, LV_PART_ITEMS);   // тема задаёт свой шрифт кнопкам: без этого кириллица не отрисуется
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
 
     // Нажатие вне клавиатуры и поля закрывает её (иначе случайно открытую клавиатуру нечем убрать, кроме клавиши OK).
@@ -184,9 +195,9 @@ void sys_toast(const char *text)
     lv_obj_remove_flag(toast_obj, LV_OBJ_FLAG_CLICKABLE);   // тост не перехватывает касания
     lv_obj_set_width(toast_obj, lv_pct(85));
     lv_obj_set_height(toast_obj, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(toast_obj, lv_color_hex(0x374151), 0);
+    lv_obj_set_style_bg_color(toast_obj, lv_color_hex(WS_FILL), 0);
     lv_obj_set_style_bg_opa(toast_obj, LV_OPA_90, 0);
-    lv_obj_set_style_radius(toast_obj, 16, 0);
+    lv_obj_set_style_radius(toast_obj, 24, 0);
     lv_obj_set_style_border_width(toast_obj, 0, 0);
     lv_obj_set_style_pad_all(toast_obj, 12, 0);
     lv_obj_align(toast_obj, LV_ALIGN_BOTTOM_MID, 0, -24);
@@ -244,8 +255,8 @@ void sys_confirm(const char *title, const char *msg, sys_confirm_cb cb, void *ud
     lv_obj_set_width(card, lv_pct(88));
     lv_obj_set_height(card, LV_SIZE_CONTENT);
     lv_obj_center(card);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0x1F2937), 0);
-    lv_obj_set_style_radius(card, 22, 0);
+    lv_obj_set_style_bg_color(card, lv_color_hex(WS_CARD), 0);
+    lv_obj_set_style_radius(card, 28, 0);
     lv_obj_set_style_border_width(card, 0, 0);
     lv_obj_set_style_pad_all(card, 16, 0);
     lv_obj_set_style_pad_row(card, 12, 0);
@@ -260,7 +271,7 @@ void sys_confirm(const char *title, const char *msg, sys_confirm_cb cb, void *ud
     lv_label_set_long_mode(m, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(m, lv_pct(100));
     lv_label_set_text(m, msg);
-    lv_obj_set_style_text_color(m, lv_color_hex(0xD1D5DB), 0);
+    lv_obj_set_style_text_color(m, lv_color_hex(WS_TEXT2), 0);
 
     lv_obj_t *row = lv_obj_create(card);
     lv_obj_remove_style_all(row);
@@ -270,11 +281,11 @@ void sys_confirm(const char *title, const char *msg, sys_confirm_cb cb, void *ud
     lv_obj_set_style_pad_gap(row, 10, 0);
     for (int yes = 0; yes < 2; yes++) {
         lv_obj_t *b = lv_button_create(row);
-        lv_obj_set_height(b, 48);
+        lv_obj_set_height(b, 52);
         lv_obj_set_flex_grow(b, 1);
-        lv_obj_set_style_radius(b, 14, 0);
+        lv_obj_set_style_radius(b, 26, 0);
         lv_obj_set_style_shadow_width(b, 0, 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(yes ? 0x3B82F6 : 0x4B5563), 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(yes ? ws_accent() : WS_FILL), 0);
         lv_obj_t *l = lv_label_create(b);
         lv_label_set_text(l, yes ? "OK" : "Cancel");
         lv_obj_center(l);
@@ -283,7 +294,22 @@ void sys_confirm(const char *title, const char *msg, sys_confirm_cb cb, void *ud
 }
 
 // ---------- каркас экрана ----------
-lv_obj_t *sys_screen_create(const char *title, lv_event_cb_t back_cb, lv_obj_t **body_out)
+// Свайп вправо по главному экрану приложения - выход (на часах нет кнопки "назад" на корневом экране).
+static void swipe_back_cb(lv_event_t *e)
+{
+    lv_indev_t *in = lv_indev_active();
+    if (in && lv_indev_get_gesture_dir(in) == LV_DIR_RIGHT) {
+        lv_indev_wait_release(in);          // свайп не должен ещё и нажать кнопку, над которой закончился
+        lv_event_cb_t cb = lv_event_get_user_data(e);
+        if (cb) cb(e);
+    }
+}
+
+// Общая сборка экрана. root=true: главный экран приложения (название цветом приложения слева, время справа,
+// выход свайпом вправо). root=false: вложенный экран (круглая кнопка "назад" слева, название по центру).
+static lv_obj_t *g_right_lbl;
+
+static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t **body_out, bool root, const char *right_text)
 {
     lv_obj_t *scr = lv_obj_create(NULL);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
@@ -295,31 +321,51 @@ lv_obj_t *sys_screen_create(const char *title, lv_event_cb_t back_cb, lv_obj_t *
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
 
     lv_obj_t *bar = lv_obj_create(scr);
+    lv_obj_remove_style_all(bar);
     lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(bar, lv_pct(100), 56);
-    lv_obj_set_style_bg_color(bar, lv_color_hex(0x111827), 0);
-    lv_obj_set_style_radius(bar, 0, 0);
-    lv_obj_set_style_border_width(bar, 0, 0);
-    lv_obj_set_style_pad_all(bar, 0, 0);
+    lv_obj_set_width(bar, lv_pct(100));
 
-    lv_obj_t *back = lv_button_create(bar);
-    lv_obj_set_size(back, 64, 40);
-    lv_obj_align(back, LV_ALIGN_LEFT_MID, 8, 0);
-    lv_obj_set_style_radius(back, 20, 0);
-    lv_obj_set_style_shadow_width(back, 0, 0);
-    lv_obj_set_style_bg_color(back, lv_color_hex(0x374151), 0);
-    lv_obj_t *bl = lv_label_create(back);
-    lv_label_set_text(bl, LV_SYMBOL_LEFT);
-    lv_obj_center(bl);
-    lv_obj_add_event_cb(back, back_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *t = lv_label_create(bar);
-    lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(t, 230);
-    lv_label_set_text(t, title);
-    lv_obj_set_style_text_color(t, lv_color_white(), 0);
-    lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(t, LV_ALIGN_CENTER, 20, 0);
+    if (root) {
+        lv_obj_set_height(bar, 62);
+        lv_obj_t *t = lv_label_create(bar);
+        lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(t, 240);
+        lv_label_set_text(t, title);
+        lv_obj_set_style_text_font(t, WATCH_FONT_BOLD_S, 0);
+        lv_obj_set_style_text_color(t, lv_color_hex(ws_accent()), 0);
+        lv_obj_align(t, LV_ALIGN_TOP_LEFT, 35, 29);
+        lv_obj_t *tm;
+        if (right_text) {                                   // вместо времени свой текст (например, длительность таймера)
+            tm = lv_label_create(bar);
+            lv_label_set_text(tm, right_text);
+            lv_obj_set_style_text_color(tm, lv_color_hex(WS_TEXT2), 0);
+            lv_obj_set_style_text_font(tm, WATCH_FONT_BODY, 0);
+            lv_obj_set_style_text_align(tm, LV_TEXT_ALIGN_RIGHT, 0);
+            lv_obj_set_width(tm, 130);
+            lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -33, 28);
+        } else {
+            tm = ws_time_label(bar);
+            lv_obj_set_style_text_font(tm, WATCH_FONT_BOLD_S, 0);
+            lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -33, 29);
+        }
+        g_right_lbl = tm;
+        if (back_cb) {
+            lv_obj_add_event_cb(scr, swipe_back_cb, LV_EVENT_GESTURE, back_cb);
+            lv_obj_set_user_data(scr, (void *)back_cb);       // для sys_screen_exit()
+        }
+    } else {
+        lv_obj_set_height(bar, 104);
+        lv_obj_t *back = ws_round_button(bar, 56, LV_SYMBOL_LEFT, WS_CARD, 0xFFFFFF, NULL, back_cb, NULL);
+        lv_obj_align(back, LV_ALIGN_TOP_LEFT, 24, 23);
+        lv_obj_t *t = lv_label_create(bar);
+        lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(t, 220);
+        lv_label_set_text(t, title);
+        lv_obj_set_style_text_font(t, WATCH_FONT_BOLD, 0);
+        lv_obj_set_style_text_color(t, lv_color_white(), 0);
+        lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(t, LV_ALIGN_TOP_MID, 28, 35);
+    }
 
     lv_obj_t *body = lv_obj_create(scr);
     lv_obj_set_width(body, lv_pct(100));
@@ -327,9 +373,37 @@ lv_obj_t *sys_screen_create(const char *title, lv_event_cb_t back_cb, lv_obj_t *
     lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(body, 0, 0);
     lv_obj_set_style_radius(body, 0, 0);
-    lv_obj_set_style_pad_all(body, 12, 0);
-    lv_obj_set_style_pad_row(body, 10, 0);
+    lv_obj_set_style_pad_all(body, 0, 0);
+    lv_obj_set_style_pad_left(body, 20, 0);
+    lv_obj_set_style_pad_right(body, 20, 0);
+    lv_obj_set_style_pad_bottom(body, 14, 0);
+    lv_obj_set_style_pad_row(body, 12, 0);
     lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
     *body_out = body;
+    return scr;
+}
+
+bool sys_screen_exit(lv_obj_t *scr)
+{
+    lv_event_cb_t cb = (lv_event_cb_t)lv_obj_get_user_data(scr);
+    if (!cb) return false;
+    cb(NULL);
+    return true;
+}
+
+lv_obj_t *sys_screen_create(const char *title, lv_event_cb_t back_cb, lv_obj_t **body_out)
+{
+    return screen_build(title, back_cb, body_out, false, NULL);
+}
+
+lv_obj_t *sys_screen_create_root(const char *title, lv_event_cb_t exit_cb, lv_obj_t **body_out)
+{
+    return screen_build(title, exit_cb, body_out, true, NULL);
+}
+
+lv_obj_t *sys_screen_create_root_text(const char *title, lv_event_cb_t exit_cb, lv_obj_t **body_out, const char *right_text, lv_obj_t **right_out)
+{
+    lv_obj_t *scr = screen_build(title, exit_cb, body_out, true, right_text);
+    if (right_out) *right_out = g_right_lbl;
     return scr;
 }

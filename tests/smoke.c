@@ -10,6 +10,8 @@
 #include "watch/messages.h"
 #include "watch/power.h"
 #include "watch/watchface.h"
+#include "watch/audio.h"
+#include "watch/fs.h"
 #include "watch/tables.h"
 #include "watch/vars.h"
 #include "watch/syscalls.h"
@@ -37,6 +39,13 @@ static void tap(int x, int y)
 {
     g_pt.x = x; g_pt.y = y; g_state = LV_INDEV_STATE_PRESSED; pump(4);
     g_state = LV_INDEV_STATE_RELEASED; pump(4);
+}
+
+static void swipe_right(void)
+{
+    g_pt.x = 4; g_pt.y = 250; g_state = LV_INDEV_STATE_PRESSED; pump(3);   // от левого края, как свайп "назад"
+    for (int x = 70; x <= 330; x += 52) { g_pt.x = x; pump(2); }
+    g_state = LV_INDEV_STATE_RELEASED; pump(40);
 }
 
 static unsigned rng = 12345;
@@ -170,8 +179,10 @@ static void tools_flow(lv_obj_t *launcher)
 
     // выйти из приложения
     for (int k = 0; k < 8 && lv_screen_active() != launcher; k++) {
+        swipe_right();
+        if (lv_screen_active() == launcher) break;
         nfound = 0; collect(lv_screen_active(), &lv_button_class);
-        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);
+        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);   // вложенный экран: первая кнопка - "назад"
         pump(25);
     }
 }
@@ -217,8 +228,10 @@ static void keyboard_flow(lv_obj_t *launcher)
 
     sys_keyboard_hide();
     for (int k = 0; k < 8 && lv_screen_active() != launcher; k++) {
+        swipe_right();
+        if (lv_screen_active() == launcher) break;
         nfound = 0; collect(lv_screen_active(), &lv_button_class);
-        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);
+        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);   // вложенный экран: первая кнопка - "назад"
         pump(25);
     }
     printf("keyboard flow done\n");
@@ -287,6 +300,37 @@ static void name_test(void)
     }
 }
 
+static void audio_flow(void)
+{
+    // запись: настоящий WAV
+    fs_mkdir("data"); 
+    const char *wp = "data/test_rec.wav";
+    CHECK(audio_rec_start(wp), "rec start");
+    pump(60);                                   // 1.2 с виртуального времени
+    CHECK(audio_rec_active() && audio_rec_ms() >= 1000, "rec runs");
+    audio_rec_stop();
+    wav_info_t w;
+    CHECK(audio_wav_info(wp, &w) && w.rate == 16000 && w.channels == 1 && w.bits == 16, "wav header valid");
+    CHECK(w.duration_ms >= 1000 && w.duration_ms <= 1400, "wav duration ~ recorded time");
+    // воспроизведение: пауза, перемотка, конец
+    CHECK(audio_play(wp, 0) && audio_is_playing(), "play starts");
+    pump(25);
+    uint32_t p1 = audio_pos_ms();
+    CHECK(p1 >= 400 && p1 <= 700, "position advances");
+    audio_pause();
+    pump(25);
+    CHECK(audio_pos_ms() == p1 && !audio_is_playing(), "pause holds position");
+    audio_seek(100);
+    CHECK(audio_pos_ms() == 100, "seek");
+    audio_resume();
+    pump(120);                                  // до конца файла
+    CHECK(audio_finished() && !audio_is_playing(), "finished at end");
+    // виртуальный трек без файла (демо)
+    CHECK(audio_play("", 5000) && audio_duration_ms() == 5000, "virtual track");
+    audio_stop();
+    fs_remove(wp);
+}
+
 int main(void)
 {
     lv_init();
@@ -324,6 +368,7 @@ int main(void)
     tools_flow(launcher);
     keyboard_flow(launcher);
     power_flow(launcher);
+    audio_flow();
     name_test();
 
     int clicks = 0;
@@ -355,10 +400,12 @@ int main(void)
         }
         // вернуться в лаунчер, если приложение ещё открыто
         for (int k = 0; k < 6 && lv_screen_active() != launcher; k++) {
-            nfound = 0; collect(lv_screen_active(), &lv_button_class);
-            if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);
-            pump(25);
-        }
+        swipe_right();
+        if (lv_screen_active() == launcher) break;
+        nfound = 0; collect(lv_screen_active(), &lv_button_class);
+        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);   // вложенный экран: первая кнопка - "назад"
+        pump(25);
+    }
         printf("%d clicks\n", app_clicks);
     }
     printf("total clicks: %d\n", clicks);

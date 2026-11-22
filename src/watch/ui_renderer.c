@@ -2,6 +2,7 @@
 #include "sys_ui.h"
 #include "syscalls.h"
 #include "tables.h"
+#include "ws_style.h"
 #include "vars.h"
 #include "watch_fonts.h"
 #include <stdio.h>
@@ -133,7 +134,7 @@ static void table_draw_cb(lv_event_t *e)
     lv_draw_dsc_base_t *base = lv_draw_task_get_draw_dsc(task);
     if (!base || base->part != LV_PART_ITEMS || base->id1 != 0) return;
     lv_draw_fill_dsc_t *fill = lv_draw_task_get_fill_dsc(task);
-    if (fill) { fill->color = lv_color_hex(0x3B82F6); fill->opa = LV_OPA_COVER; }
+    if (fill) { fill->color = lv_color_hex(ws_accent()); fill->opa = LV_OPA_COVER; }
     lv_draw_label_dsc_t *lab = lv_draw_task_get_label_dsc(task);
     if (lab) lab->color = lv_color_white();
 }
@@ -156,9 +157,9 @@ static void build_table(lv_obj_t *parent, const wtable_t *wt, bool header)
     lv_obj_set_style_pad_all(t, 0, 0);
     lv_obj_set_style_text_font(t, WATCH_FONT_SMALL, LV_PART_ITEMS);
     lv_obj_set_style_text_color(t, lv_color_white(), LV_PART_ITEMS);
-    lv_obj_set_style_bg_color(t, lv_color_hex(0x1F2937), LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(t, lv_color_hex(WS_CARD), LV_PART_ITEMS);
     lv_obj_set_style_bg_opa(t, LV_OPA_COVER, LV_PART_ITEMS);
-    lv_obj_set_style_border_color(t, lv_color_hex(0x374151), LV_PART_ITEMS);
+    lv_obj_set_style_border_color(t, lv_color_hex(WS_FILL), LV_PART_ITEMS);
     lv_obj_set_style_border_width(t, 1, LV_PART_ITEMS);
     lv_obj_set_style_pad_all(t, 8, LV_PART_ITEMS);
     if (header) {
@@ -214,9 +215,10 @@ static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, b
         lv_obj_t *b = lv_button_create(parent);
         lv_obj_set_height(b, 52);
         if (in_row) lv_obj_set_flex_grow(b, 1); else lv_obj_set_width(b, lv_pct(100));
-        lv_obj_set_style_radius(b, 14, 0);
+        lv_obj_set_style_radius(b, 26, 0);
         lv_obj_set_style_shadow_width(b, 0, 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(jcolor(n, "color", 0x3B82F6)), 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(jcolor(n, "color", WS_FILL)), 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(WS_FILL2), LV_STATE_PRESSED);
         lv_obj_t *l = lv_label_create(b);
         lv_obj_set_style_text_color(l, lv_color_white(), 0);
         set_bound_text(c->r, l, jstr(n, "text") ? jstr(n, "text") : "");
@@ -229,10 +231,13 @@ static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, b
         lv_textarea_set_one_line(ta, true);
         lv_textarea_set_max_length(ta, VAR_VAL - 1);
         if (in_row) lv_obj_set_flex_grow(ta, 1); else lv_obj_set_width(ta, lv_pct(100));
-        lv_obj_set_style_bg_color(ta, lv_color_hex(0x1F2937), 0);
+        lv_obj_set_style_bg_color(ta, lv_color_hex(WS_CARD), 0);
         lv_obj_set_style_text_color(ta, lv_color_white(), 0);
-        lv_obj_set_style_border_color(ta, lv_color_hex(0x374151), 0);
-        lv_obj_set_style_radius(ta, 12, 0);
+        lv_obj_set_style_text_color(ta, lv_color_hex(WS_TEXT2), LV_PART_TEXTAREA_PLACEHOLDER);
+        lv_obj_set_style_border_width(ta, 0, 0);
+        lv_obj_set_style_radius(ta, 20, 0);
+        lv_obj_set_style_pad_all(ta, 14, 0);
+        lv_obj_set_style_bg_color(ta, lv_color_hex(ws_accent()), LV_PART_CURSOR);
         const char *ph = jstr(n, "placeholder");
         if (ph) lv_textarea_set_placeholder_text(ta, ph);
         const char *var = jstr(n, "var");
@@ -247,6 +252,9 @@ static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, b
         lv_obj_set_style_text_color(l, lv_color_white(), 0);
         set_bound_text(c->r, l, jstr(n, "text") ? jstr(n, "text") : "");
         lv_obj_t *sw = lv_switch_create(row);
+        lv_obj_set_style_bg_color(sw, lv_color_hex(WS_FILL2), 0);
+        lv_obj_set_style_bg_color(sw, lv_color_hex(WS_GREEN), LV_PART_INDICATOR | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(sw, lv_color_white(), LV_PART_KNOB);
         const char *var = jstr(n, "var");
         if (!vars_valid_name(var)) var = NULL;
         if (var && strcmp(vars_get(var), "1") == 0) lv_obj_add_state(sw, LV_STATE_CHECKED);
@@ -273,9 +281,10 @@ static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, b
             lv_obj_set_width(b, lv_pct(100));
             lv_obj_set_height(b, LV_SIZE_CONTENT);
             lv_obj_set_style_min_height(b, 48, 0);
-            lv_obj_set_style_radius(b, 12, 0);
+            lv_obj_set_style_radius(b, 22, 0);
             lv_obj_set_style_shadow_width(b, 0, 0);
-            lv_obj_set_style_bg_color(b, lv_color_hex(0x1F2937), 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(WS_CARD), 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(WS_FILL), LV_STATE_PRESSED);
             lv_obj_t *l = lv_label_create(b);
             lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
             lv_obj_set_width(l, lv_pct(100));
@@ -311,6 +320,9 @@ static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, b
         lv_obj_t *sl = lv_slider_create(row);
         lv_obj_set_width(sl, lv_pct(90));
         lv_obj_set_style_pad_all(sl, 6, LV_PART_KNOB);
+        lv_obj_set_style_bg_color(sl, lv_color_hex(WS_FILL2), 0);
+        lv_obj_set_style_bg_color(sl, lv_color_hex(ws_accent()), LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(sl, lv_color_white(), LV_PART_KNOB);
         lv_slider_set_range(sl, lo, hi);
         const char *var = jstr(n, "var");
         if (!vars_valid_name(var)) var = NULL;
@@ -326,7 +338,8 @@ static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, b
         int hi = cJSON_IsNumber(mx) ? (int)mx->valuedouble : 100;
         if (hi <= lo) hi = lo + 1;
         lv_bar_set_range(bar, lo, hi);
-        lv_obj_set_style_bg_color(bar, lv_color_hex(jcolor(n, "color", 0x3B82F6)), LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(bar, lv_color_hex(WS_FILL2), 0);
+        lv_obj_set_style_bg_color(bar, lv_color_hex(jcolor(n, "color", ws_accent())), LV_PART_INDICATOR);
         const char *var = jstr(n, "var");
         if (vars_valid_name(var)) {
             lv_bar_set_value(bar, (int32_t)strtod(vars_get(var), NULL), LV_ANIM_OFF);
@@ -370,7 +383,9 @@ lv_obj_t *ui_build_screen(app_run_t *r, const char *name)
     r->nbind = 0;
 
     lv_obj_t *body;
-    lv_obj_t *scr = sys_screen_create(jstr(sc, "title") ? jstr(sc, "title") : r->app->name, back_cb, &body);
+    bool is_root = r->depth >= 1 && strcmp(name, r->hist[0]) == 0;
+    const char *ttl = jstr(sc, "title") ? jstr(sc, "title") : r->app->name;
+    lv_obj_t *scr = is_root ? sys_screen_create_root(ttl, back_cb, &body) : sys_screen_create(ttl, back_cb, &body);
 
     bctx_t c = { r, 0, false };
     add_children(&c, body, cJSON_GetObjectItemCaseSensitive(sc, "ui"), 1, false);

@@ -1,4 +1,5 @@
 #include "pinpad.h"
+#include "ws_style.h"
 #include "auth.h"
 #include "watch_fonts.h"
 #include <stdint.h>
@@ -119,7 +120,9 @@ lv_obj_t *pinpad_create(lv_obj_t *parent, int auto_len, pinpad_cb cb, void *ud)
             lv_obj_set_size(b, 74, 74);
             lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
             lv_obj_set_style_shadow_width(b, 0, 0);
-            lv_obj_set_style_bg_color(b, lv_color_hex(i == 11 ? 0x2563EB : 0x1F2937), 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(i == 11 ? WS_GREEN : WS_FILL), 0);
+            lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(WS_FILL2), LV_STATE_PRESSED);
             lv_obj_t *l = lv_label_create(b);
             lv_label_set_text(l, labels[i]);
             lv_obj_set_style_text_font(l, WATCH_FONT_LARGE, 0);

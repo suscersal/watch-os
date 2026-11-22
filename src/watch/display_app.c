@@ -1,4 +1,5 @@
 #include "display_app.h"
+#include "ws_style.h"
 #include "power.h"
 #include "sys_ui.h"
 #include <stdio.h>
@@ -60,6 +61,7 @@ static void add_dropdown(const char *title, const char *options, const int *opts
     lv_obj_set_style_text_color(h, lv_color_hex(0x9CA3AF), 0);
     lv_obj_t *dd = lv_dropdown_create(body);
     lv_obj_set_width(dd, lv_pct(100));
+    ws_style_dropdown(dd);
     lv_dropdown_set_options(dd, options);
     uint32_t sel = 0;
     for (uint32_t i = 0; i < NOPT; i++) if (opts[i] == current) sel = i;
@@ -70,7 +72,7 @@ static void add_dropdown(const char *title, const char *options, const int *opts
 void display_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    scr = sys_screen_create("Display", back_cb, &body);
+    scr = sys_screen_create_root("Display", back_cb, &body);
     lv_obj_add_event_cb(scr, deleted_cb, LV_EVENT_DELETE, NULL);
 
     int dim, off, br;
@@ -82,6 +84,9 @@ void display_open(lv_obj_t *launcher)
     lv_obj_t *sl = lv_slider_create(body);
     lv_obj_set_width(sl, lv_pct(90));
     lv_obj_set_style_pad_all(sl, 6, LV_PART_KNOB);
+    lv_obj_set_style_bg_color(sl, lv_color_hex(WS_FILL2), 0);
+    lv_obj_set_style_bg_color(sl, lv_color_hex(ws_accent()), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(sl, lv_color_white(), LV_PART_KNOB);
     lv_slider_set_range(sl, 5, 100);
     lv_slider_set_value(sl, br, LV_ANIM_OFF);
     lv_obj_add_event_cb(sl, slider_cb, LV_EVENT_VALUE_CHANGED, NULL);

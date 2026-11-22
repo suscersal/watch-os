@@ -59,3 +59,39 @@ bool fs_write_file(const char *path, const char *data, size_t n)
 }
 
 bool fs_remove(const char *path) { return remove(path) == 0; }
+
+bool fs_append_file(const char *path, const void *data, size_t n)
+{
+    FILE *f = fopen(path, "ab");
+    if (!f) return false;
+    bool ok = fwrite(data, 1, n, f) == n;
+    return (fclose(f) == 0) && ok;
+}
+
+bool fs_write_at(const char *path, size_t offset, const void *data, size_t n)
+{
+    FILE *f = fopen(path, "r+b");
+    if (!f) return false;
+    bool ok = fseek(f, (long)offset, SEEK_SET) == 0 && fwrite(data, 1, n, f) == n;
+    return (fclose(f) == 0) && ok;
+}
+
+long fs_file_size(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fclose(f);
+    return sz;
+}
+
+long fs_read_range(const char *path, size_t offset, void *buf, size_t n)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    if (fseek(f, (long)offset, SEEK_SET) != 0) { fclose(f); return -1; }
+    size_t rd = fread(buf, 1, n, f);
+    fclose(f);
+    return (long)rd;
+}

@@ -1,4 +1,5 @@
 #include "gallery_app.h"
+#include "ws_style.h"
 #include "clock.h"
 #include "photos.h"
 #include "sys_ui.h"
@@ -163,10 +164,10 @@ static void viewer_open(int start)
     view_img = lv_image_create(view_scr);
     lv_obj_center(view_img);
 
-    lv_obj_align(round_btn(view_scr, LV_SYMBOL_LEFT, 0x374151, viewer_back_cb, NULL), LV_ALIGN_TOP_LEFT, 10, 10);
+    lv_obj_align(round_btn(view_scr, LV_SYMBOL_LEFT, WS_FILL, viewer_back_cb, NULL), LV_ALIGN_TOP_LEFT, 10, 10);
     lv_obj_align(round_btn(view_scr, LV_SYMBOL_TRASH, 0xB91C1C, delete_cb, NULL), LV_ALIGN_TOP_RIGHT, -10, 10);
-    lv_obj_align(round_btn(view_scr, LV_SYMBOL_PREV, 0x374151, step_cb, (void *)(intptr_t)-1), LV_ALIGN_BOTTOM_LEFT, 10, -10);
-    lv_obj_align(round_btn(view_scr, LV_SYMBOL_NEXT, 0x374151, step_cb, (void *)(intptr_t)+1), LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+    lv_obj_align(round_btn(view_scr, LV_SYMBOL_PREV, WS_FILL, step_cb, (void *)(intptr_t)-1), LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    lv_obj_align(round_btn(view_scr, LV_SYMBOL_NEXT, WS_FILL, step_cb, (void *)(intptr_t)+1), LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
     view_count = lv_label_create(view_scr);
     lv_obj_set_style_text_color(view_count, lv_color_white(), 0);
@@ -205,7 +206,7 @@ static void build_grid(void)
         lv_obj_set_style_pad_all(cell, 0, 0);
         lv_obj_set_style_radius(cell, 10, 0);
         lv_obj_set_style_border_width(cell, 0, 0);
-        lv_obj_set_style_bg_color(cell, lv_color_hex(0x1F2937), 0);
+        lv_obj_set_style_bg_color(cell, lv_color_hex(WS_CARD), 0);
         lv_obj_set_style_clip_corner(cell, true, 0);
         lv_obj_add_event_cb(cell, cell_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
 
@@ -237,7 +238,7 @@ static void grid_back_cb(lv_event_t *e)
 void gallery_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    grid_scr = sys_screen_create("Gallery", grid_back_cb, &grid_body);
+    grid_scr = sys_screen_create_root("Gallery", grid_back_cb, &grid_body);
     lv_obj_add_event_cb(grid_scr, grid_gone_cb, LV_EVENT_DELETE, NULL);
     lv_obj_set_flex_flow(grid_body, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_row(grid_body, 8, 0);

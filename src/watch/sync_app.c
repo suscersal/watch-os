@@ -69,7 +69,7 @@ void sync_app_open(lv_obj_t *launcher)
     g_launcher = launcher;
     got_photos = 0;
     lv_obj_t *body;
-    scr = sys_screen_create("Sync", back_cb, &body);
+    scr = sys_screen_create_root("Sync", back_cb, &body);
     lv_obj_add_event_cb(scr, gone_cb, LV_EVENT_DELETE, NULL);
 
     add_label(body, "In the phone app enter this address and code:", 0x9CA3AF, NULL);

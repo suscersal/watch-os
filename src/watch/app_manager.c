@@ -3,6 +3,9 @@
 #include "cJSON.h"
 #include "installer.h"
 #include "display_app.h"
+#include "music_app.h"
+#include "recorder_app.h"
+#include "timer_app.h"
 #include "security_app.h"
 #include "gallery_app.h"
 #include "messages_app.h"
@@ -20,6 +23,7 @@ static size_t     napps;
 static char       g_root[64] = "apps";
 
 static const struct { const char *key; const char *sym; } icon_tbl[] = {
+    {"mic", "\xEF\x84\xB0"}, {"timer", "\xEF\x8B\xB2"},   // секундомер (FontAwesome f2f2)     // микрофон (FontAwesome f130, есть в шрифтах проекта)
     {"calc", LV_SYMBOL_KEYBOARD}, {"list", LV_SYMBOL_LIST},   {"edit", LV_SYMBOL_EDIT},
     {"bell", LV_SYMBOL_BELL},     {"gps", LV_SYMBOL_GPS},     {"settings", LV_SYMBOL_SETTINGS},
     {"mail", LV_SYMBOL_ENVELOPE}, {"audio", LV_SYMBOL_AUDIO}, {"image", LV_SYMBOL_IMAGE},
@@ -126,6 +130,33 @@ size_t app_manager_scan(const char *root)
         snprintf(a->icon, sizeof a->icon, "download");
         a->color = 0x0EA5E9;
         a->builtin = installer_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_music");
+        snprintf(a->name, sizeof a->name, "Музыка");
+        snprintf(a->icon, sizeof a->icon, "audio");
+        a->color = 0xFF4D6D;
+        a->builtin = music_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_timer");
+        snprintf(a->name, sizeof a->name, "Таймер");
+        snprintf(a->icon, sizeof a->icon, "timer");
+        a->color = 0xFF8800;
+        a->builtin = timer_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_recorder");
+        snprintf(a->name, sizeof a->name, "Диктофон");
+        snprintf(a->icon, sizeof a->icon, "mic");
+        a->color = 0xFF3B30;
+        a->builtin = recorder_open;
     }
     if (napps < APPS_MAX) {
         app_info_t *a = &apps[napps++];

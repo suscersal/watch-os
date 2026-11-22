@@ -18,3 +18,9 @@ bool fs_remove(const char *path);                                 // файл и
 
 // То же, но возвращает длину (для бинарных файлов, например JPEG).
 char *fs_read_file_n(const char *path, size_t max_size, size_t *len_out);
+
+// Работа с большими файлами по частям (запись и воспроизведение звука), без чтения целиком в память.
+bool fs_append_file(const char *path, const void *data, size_t n);                 // дописать в конец (создаёт файл)
+bool fs_write_at(const char *path, size_t offset, const void *data, size_t n);     // перезаписать кусок существующего файла
+long fs_file_size(const char *path);                                               // -1, если файла нет
+long fs_read_range(const char *path, size_t offset, void *buf, size_t n);          // прочитано байт, -1 при ошибке

@@ -20,4 +20,11 @@ void sys_confirm(const char *title, const char *msg, sys_confirm_cb cb, void *ud
 void sys_confirm_close(void);   // закрыть без вызова cb
 
 // Системный каркас экрана: верхняя панель с кнопкой "назад" и прокручиваемое тело.
+// Вложенный экран: круглая кнопка "назад" слева, название по центру.
 lv_obj_t *sys_screen_create(const char *title, lv_event_cb_t back_cb, lv_obj_t **body_out);
+// Выйти из приложения так же, как свайпом вправо по главному экрану (для тестов и аппаратной кнопки). false, если экран не главный.
+bool sys_screen_exit(lv_obj_t *scr);
+// Главный экран приложения: название цветом приложения слева, время справа, выход свайпом вправо (вызывает exit_cb).
+lv_obj_t *sys_screen_create_root(const char *title, lv_event_cb_t exit_cb, lv_obj_t **body_out);
+// То же, но справа вместо времени свой текст (метка возвращается в right_out, чтобы менять текст).
+lv_obj_t *sys_screen_create_root_text(const char *title, lv_event_cb_t exit_cb, lv_obj_t **body_out, const char *right_text, lv_obj_t **right_out);
