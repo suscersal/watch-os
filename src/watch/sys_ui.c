@@ -391,7 +391,7 @@ static lv_timer_t *g_home_timer;
 static void home_indev_cb(lv_event_t *e)
 {
     lv_event_code_t c = lv_event_get_code(e);
-    lv_indev_t *in = lv_event_get_indev(e);
+    lv_indev_t *in = lv_event_get_target(e);   // у событий самого индева цель - сам индев (lv_event_get_indev вернул бы объект)
     if (!in) return;
     if (c == LV_EVENT_RELEASED) { g_home_armed = false; return; }
     if (c != LV_EVENT_PRESSED) return;
