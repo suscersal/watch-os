@@ -16,47 +16,90 @@ void sys_ui_init(void)
     lv_obj_set_style_text_font(lv_layer_sys(), WATCH_FONT_BODY, 0);
 }
 
-// ---------- раскладки: EN и RU, строчные и заглавные ----------
+// ---------- клавиатура с крупными клавишами ----------
+// Буквы делятся на две страницы: первая половина алфавита сразу, вторая - после нажатия кнопки "n-z" / "а-п" и т.п.
+// Третья страница: цифры, знаки, курсор, Aa (заглавная на одну букву) и смена языка.
 #define BKSP LV_SYMBOL_BACKSPACE
-static const char *const map_en_l[] = {
-    "q","w","e","r","t","y","u","i","o","p",BKSP,"\n",
-    "ABC","a","s","d","f","g","h","j","k","l","\n",
-    "_","-","z","x","c","v","b","n","m",".",",",":","\n",
-    "1#","RU",LV_SYMBOL_LEFT," ",LV_SYMBOL_RIGHT,LV_SYMBOL_OK,""};
-static const char *const map_en_u[] = {
-    "Q","W","E","R","T","Y","U","I","O","P",BKSP,"\n",
-    "abc","A","S","D","F","G","H","J","K","L","\n",
-    "_","-","Z","X","C","V","B","N","M",".",",",":","\n",
-    "1#","RU",LV_SYMBOL_LEFT," ",LV_SYMBOL_RIGHT,LV_SYMBOL_OK,""};
-static const char *const map_ru_l[] = {
-    "й","ц","у","к","е","н","г","ш","щ","з","х",BKSP,"\n",
-    "ABC","ф","ы","в","а","п","р","о","л","д","ж","э","\n",
-    "ё","я","ч","с","м","и","т","ь","б","ю","ъ","\n",
-    "1#","EN",LV_SYMBOL_LEFT," ",LV_SYMBOL_RIGHT,".",LV_SYMBOL_OK,""};
-static const char *const map_ru_u[] = {
-    "Й","Ц","У","К","Е","Н","Г","Ш","Щ","З","Х",BKSP,"\n",
-    "abc","Ф","Ы","В","А","П","Р","О","Л","Д","Ж","Э","\n",
-    "Ё","Я","Ч","С","М","И","Т","Ь","Б","Ю","Ъ","\n",
-    "1#","EN",LV_SYMBOL_LEFT," ",LV_SYMBOL_RIGHT,".",LV_SYMBOL_OK,""};
+
+typedef struct { const char *t; uint8_t w; } key_t;     // t == NULL - конец строки клавиш; t == "" и w == 0 - конец раскладки
+#define ROW         { NULL, 0 }
+#define END         { "", 0 }
+
+static const key_t en_a[] = {      // a-m
+    {"a",1},{"b",1},{"c",1},{"d",1},{"e",1}, ROW,
+    {"f",1},{"g",1},{"h",1},{"i",1},{"j",1}, ROW,
+    {"k",1},{"l",1},{"m",1},{BKSP,2}, ROW,
+    {"n-z",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, END };
+static const key_t en_b[] = {      // n-z
+    {"n",1},{"o",1},{"p",1},{"q",1},{"r",1}, ROW,
+    {"s",1},{"t",1},{"u",1},{"v",1},{"w",1}, ROW,
+    {"x",1},{"y",1},{"z",1},{BKSP,2}, ROW,
+    {"a-m",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, END };
+static const key_t ru_a[] = {      // а-п
+    {"а",1},{"б",1},{"в",1},{"г",1},{"д",1},{"е",1}, ROW,
+    {"ё",1},{"ж",1},{"з",1},{"и",1},{"й",1},{"к",1}, ROW,
+    {"л",1},{"м",1},{"н",1},{"о",1},{"п",1},{BKSP,1}, ROW,
+    {"р-я",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, END };
+static const key_t ru_b[] = {      // р-я
+    {"р",1},{"с",1},{"т",1},{"у",1},{"ф",1},{"х",1}, ROW,
+    {"ц",1},{"ч",1},{"ш",1},{"щ",1},{"ъ",1},{"ы",1}, ROW,
+    {"ь",1},{"э",1},{"ю",1},{"я",1},{BKSP,2}, ROW,
+    {"а-п",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, END };
+static const key_t sym[] = {
+    {"1",1},{"2",1},{"3",1},{"4",1},{"5",1}, ROW,
+    {"6",1},{"7",1},{"8",1},{"9",1},{"0",1}, ROW,
+    {".",1},{",",1},{"!",1},{"?",1},{"-",1}, ROW,
+    {"@",1},{":",1},{"_",1},{"/",1},{"#",1}, ROW,
+    {LV_SYMBOL_LEFT,1},{LV_SYMBOL_RIGHT,1},{"Aa",1},{"@LANG",1},{BKSP,1}, ROW,
+    {"abc",1},{" ",3},{LV_SYMBOL_OK,1}, END };
 
 #define KB_MAX_KEYS 48
-static lv_buttonmatrix_ctrl_t kb_ctrl[4][KB_MAX_KEYS];
+static const char *kb_map[KB_MAX_KEYS + 16];            // метки и "\n" между строками, в конце ""
+static lv_buttonmatrix_ctrl_t kb_ctrl[KB_MAX_KEYS];
+static char kb_txt[KB_MAX_KEYS][4];                     // заглавные буквы и подпись языка
+static int  kb_page;                                    // 0 - первая половина алфавита, 1 - вторая, 2 - цифры и знаки
+static int  kb_lpage;                                   // последняя страница с буквами (куда возвращает "abc")
+static bool kb_shift;                                   // следующая буква заглавная
 
-static void build_ctrl(const char *const *map, lv_buttonmatrix_ctrl_t *ctrl)
+static bool is_letter(const char *t)
 {
-    int i = 0;
-    for (const char *const *p = map; p[0][0] != '\0' && i < KB_MAX_KEYS; p++) {
-        const char *t = *p;
-        if (t[0] == '\n') continue;
-        int w = 4;                                               // обычная буква
-        if (strcmp(t, " ") == 0) w = 12;                         // пробел
-        else if ((unsigned char)t[0] == 0xEF || (strlen(t) >= 2 && (unsigned char)t[0] < 0x80)) w = 6;   // символ или "ABC"/"1#"
-        ctrl[i++] = (lv_buttonmatrix_ctrl_t)(LV_BUTTONMATRIX_CTRL_NO_REPEAT | LV_BUTTONMATRIX_CTRL_CLICK_TRIG | w);
-    }
+    unsigned char c = (unsigned char)t[0];
+    if (t[1] == '\0') return c >= 'a' && c <= 'z';
+    return (c == 0xD0 || c == 0xD1) && t[2] == '\0';     // кириллица в UTF-8: 2 байта
 }
 
-static void kb_show_lower(void) { lv_keyboard_set_mode(kb, kb_lang ? LV_KEYBOARD_MODE_USER_3 : LV_KEYBOARD_MODE_USER_1); }
-static void kb_show_upper(void) { lv_keyboard_set_mode(kb, kb_lang ? LV_KEYBOARD_MODE_USER_4 : LV_KEYBOARD_MODE_USER_2); }
+static void to_upper(const char *t, char *out)
+{
+    unsigned char c = (unsigned char)t[0], d = (unsigned char)t[1];
+    if (d == '\0') { out[0] = (char)(c - 32); out[1] = '\0'; return; }
+    out[0] = (char)0xD0;
+    if (c == 0xD0)      out[1] = (char)(d - 0x20);      // а-п -> А-П
+    else if (d == 0x91) out[1] = (char)0x81;             // ё -> Ё
+    else                out[1] = (char)(d + 0x20);       // р-я -> Р-Я
+    out[2] = '\0';
+}
+
+static void kb_apply(void)
+{
+    const key_t *tbl = kb_page == 2 ? sym : kb_lang ? (kb_page ? ru_b : ru_a) : (kb_page ? en_b : en_a);
+    int n = 0, nk = 0;
+    for (const key_t *k = tbl; k->w || k->t == NULL || k->t[0]; k++) {
+        if (!k->t) { kb_map[n++] = "\n"; continue; }
+        if (nk >= KB_MAX_KEYS) break;
+        const char *t = k->t;
+        lv_buttonmatrix_ctrl_t ctrl = LV_BUTTONMATRIX_CTRL_NO_REPEAT | LV_BUTTONMATRIX_CTRL_CLICK_TRIG | k->w;
+        if (strcmp(t, "@LANG") == 0) { t = kb_lang ? "EN" : "RU"; }
+        else if (kb_shift && is_letter(t)) { to_upper(t, kb_txt[nk]); t = kb_txt[nk]; }
+        else if (strcmp(t, "Aa") == 0 && kb_shift) ctrl |= LV_BUTTONMATRIX_CTRL_CHECKED;
+        kb_map[n++] = t;
+        kb_ctrl[nk++] = ctrl;
+    }
+    kb_map[n] = "";
+    lv_buttonmatrix_set_map(kb, kb_map);
+    lv_buttonmatrix_set_ctrl_map(kb, kb_ctrl);
+}
+
+static void kb_reset(void) { kb_page = 0; kb_lpage = 0; kb_shift = false; kb_apply(); }
 
 static void kb_key_cb(lv_event_t *e)
 {
@@ -66,23 +109,29 @@ static void kb_key_cb(lv_event_t *e)
     const char *t = lv_buttonmatrix_get_button_text(k, id);
     if (!t) return;
     lv_obj_t *ta = lv_keyboard_get_textarea(k);
-    lv_keyboard_mode_t mode = lv_keyboard_get_mode(k);
 
-    if (strcmp(t, "ABC") == 0)                 kb_show_upper();
-    else if (strcmp(t, "abc") == 0)            kb_show_lower();
-    else if (strcmp(t, "1#") == 0)             lv_keyboard_set_mode(k, LV_KEYBOARD_MODE_SPECIAL);
-    else if (strcmp(t, "RU") == 0)           { kb_lang = 1; kb_show_lower(); }
-    else if (strcmp(t, "EN") == 0)           { kb_lang = 0; kb_show_lower(); }
-    else if (strcmp(t, LV_SYMBOL_OK) == 0)     lv_obj_send_event(k, LV_EVENT_READY, NULL);
-    else if (strcmp(t, LV_SYMBOL_CLOSE) == 0 || strcmp(t, LV_SYMBOL_KEYBOARD) == 0) lv_obj_send_event(k, LV_EVENT_CANCEL, NULL);
-    else if (!ta)                              return;
-    else if (strcmp(t, BKSP) == 0)             lv_textarea_delete_char(ta);
-    else if (strcmp(t, LV_SYMBOL_LEFT) == 0)   lv_textarea_cursor_left(ta);
-    else if (strcmp(t, LV_SYMBOL_RIGHT) == 0)  lv_textarea_cursor_right(ta);
-    else if (strcmp(t, LV_SYMBOL_NEW_LINE) == 0) { if (!lv_textarea_get_one_line(ta)) lv_textarea_add_char(ta, '\n'); }
+    // Копию текста берём сразу: перестройка раскладки меняет буферы, на которые указывает t.
+    char key[8];
+    strncpy(key, t, sizeof key - 1);
+    key[sizeof key - 1] = '\0';
+
+    if (strcmp(key, "n-z") == 0 || strcmp(key, "a-m") == 0 || strcmp(key, "р-я") == 0 || strcmp(key, "а-п") == 0) {
+        kb_page = kb_lpage = kb_page ? 0 : 1;                                 // другая половина алфавита
+        kb_apply();
+    }
+    else if (strcmp(key, "123") == 0)         { kb_lpage = kb_page; kb_page = 2; kb_apply(); }
+    else if (strcmp(key, "abc") == 0)         { kb_page = kb_lpage; kb_apply(); }
+    else if (strcmp(key, "Aa") == 0)          { kb_shift = !kb_shift; kb_apply(); }
+    else if (strcmp(key, "RU") == 0)          { kb_lang = 1; kb_lpage = 0; kb_apply(); }
+    else if (strcmp(key, "EN") == 0)          { kb_lang = 0; kb_lpage = 0; kb_apply(); }
+    else if (strcmp(key, LV_SYMBOL_OK) == 0)    lv_obj_send_event(k, LV_EVENT_READY, NULL);
+    else if (!ta)                               return;
+    else if (strcmp(key, BKSP) == 0)            lv_textarea_delete_char(ta);
+    else if (strcmp(key, LV_SYMBOL_LEFT) == 0)  lv_textarea_cursor_left(ta);
+    else if (strcmp(key, LV_SYMBOL_RIGHT) == 0) lv_textarea_cursor_right(ta);
     else {
-        lv_textarea_add_text(ta, t);
-        if (mode == LV_KEYBOARD_MODE_USER_2 || mode == LV_KEYBOARD_MODE_USER_4) kb_show_lower();   // заглавная только на одну букву
+        lv_textarea_add_text(ta, key);
+        if (kb_shift) { kb_shift = false; kb_apply(); }                       // заглавная только на одну букву
     }
 }
 
@@ -118,16 +167,17 @@ static void kb_create(void)
     lv_obj_remove_event_cb(kb, lv_keyboard_def_event_cb);   // своя обработка клавиш
     lv_obj_add_event_cb(kb, kb_key_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(kb, kb_cb, LV_EVENT_ALL, NULL);
-    lv_obj_set_size(kb, lv_pct(100), lv_pct(45));
-    lv_obj_set_style_text_font(kb, WATCH_FONT_BODY, LV_PART_ITEMS);
+    lv_obj_set_size(kb, lv_pct(100), lv_pct(56));        // крупные клавиши: больше половины экрана
+    lv_obj_set_style_text_font(kb, WATCH_FONT_LARGE, LV_PART_ITEMS);
     lv_obj_set_style_bg_color(kb, lv_color_hex(WS_BG), 0);
-    lv_obj_set_style_pad_all(kb, 6, 0);
-    lv_obj_set_style_pad_gap(kb, 6, 0);
+    lv_obj_set_style_pad_all(kb, 8, 0);
+    lv_obj_set_style_pad_gap(kb, 8, 0);
     lv_obj_set_style_border_width(kb, 0, 0);
     lv_obj_set_style_bg_color(kb, lv_color_hex(WS_FILL), LV_PART_ITEMS);
     lv_obj_set_style_bg_color(kb, lv_color_hex(WS_FILL2), LV_PART_ITEMS | LV_STATE_PRESSED);
     lv_obj_set_style_text_color(kb, lv_color_white(), LV_PART_ITEMS);
-    lv_obj_set_style_radius(kb, 12, LV_PART_ITEMS);
+    lv_obj_set_style_radius(kb, 18, LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(kb, lv_color_hex(WS_BLUE), LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_set_style_shadow_width(kb, 0, LV_PART_ITEMS);
     lv_obj_set_style_border_width(kb, 0, LV_PART_ITEMS);   // тема задаёт свой шрифт кнопкам: без этого кириллица не отрисуется
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
@@ -136,12 +186,6 @@ static void kb_create(void)
     for (lv_indev_t *i = lv_indev_get_next(NULL); i; i = lv_indev_get_next(i))
         lv_indev_add_event_cb(i, indev_press_cb, LV_EVENT_PRESSED, NULL);
 
-    const char *const *maps[4] = { map_en_l, map_en_u, map_ru_l, map_ru_u };
-    lv_keyboard_mode_t modes[4] = { LV_KEYBOARD_MODE_USER_1, LV_KEYBOARD_MODE_USER_2, LV_KEYBOARD_MODE_USER_3, LV_KEYBOARD_MODE_USER_4 };
-    for (int i = 0; i < 4; i++) {
-        build_ctrl(maps[i], kb_ctrl[i]);
-        lv_keyboard_set_map(kb, modes[i], maps[i], kb_ctrl[i]);
-    }
 }
 
 void sys_keyboard_set_lang(int ru) { kb_lang = ru ? 1 : 0; }
@@ -151,7 +195,7 @@ void sys_keyboard_attach(lv_obj_t *ta)
 {
     if (!kb) kb_create();
     lv_keyboard_set_textarea(kb, ta);
-    kb_show_lower();
+    kb_reset();
     lv_obj_remove_flag(kb, LV_OBJ_FLAG_HIDDEN);
 
     // Размер самого экрана менять нельзя, поэтому добавляем ему нижний отступ на высоту клавиатуры:

@@ -222,7 +222,7 @@ static void keyboard_flow(lv_obj_t *launcher)
     CHECK(sys_keyboard_visible(), "real tap on keyboard keeps it open");
     tap(200, 122);
     CHECK(sys_keyboard_visible(), "real tap on input keeps keyboard open");
-    tap(200, 245);
+    tap(200, 200);                                         // между полем и клавиатурой (клавиатура с крупными клавишами начинается около y=221)
     CHECK(!sys_keyboard_visible(), "real tap on empty area closes keyboard");
     tap(200, 122);
     CHECK(sys_keyboard_visible(), "real tap on input opens keyboard again");
