@@ -361,24 +361,84 @@ static bool       g_exit_up;       // идёт выход свайпом вве�
 static lv_point_t g_home_start;
 static bool       g_home_done;
 
-static void home_swipe_cb(lv_event_t *e)
+// Полоса внизу НЕ кликабельна: иначе она перехватывала бы нажатия кнопок, стоящих в нижних 96 px (в «Музыке» там
+// кнопки перемешивания, громкости и очереди). Нажатия идут к кнопкам как обычно, а свайп вверх от нижнего края
+// отслеживается отдельно: PRESSED (индев) запоминает точку и «взводит» распознаватель, таймер следит за пальцем.
+static void home_zone_marker_cb(lv_event_t *e) { LV_UNUSED(e); }   // метка: у экрана есть полоса, user_data = колбэк выхода
+
+static lv_obj_t *home_zone_of_active(lv_event_cb_t *exit_cb)
+{
+    lv_obj_t *scr = lv_screen_active();
+    if (!scr) return NULL;
+    for (int32_t i = (int32_t)lv_obj_get_child_count(scr) - 1; i >= 0; i--) {
+        lv_obj_t *ch = lv_obj_get_child(scr, i);
+        uint32_t n = lv_obj_get_event_count(ch);
+        for (uint32_t k = 0; k < n; k++) {
+            lv_event_dsc_t *d = lv_obj_get_event_dsc(ch, k);
+            if (lv_event_dsc_get_cb(d) == home_zone_marker_cb) {
+                if (exit_cb) *exit_cb = (lv_event_cb_t)lv_event_dsc_get_user_data(d);
+                return ch;
+            }
+        }
+    }
+    return NULL;
+}
+
+static lv_indev_t *g_home_in;
+static bool        g_home_armed;
+static lv_timer_t *g_home_timer;
+
+static void home_indev_cb(lv_event_t *e)
 {
     lv_event_code_t c = lv_event_get_code(e);
-    lv_indev_t *in = lv_indev_active();
+    lv_indev_t *in = lv_event_get_indev(e);
     if (!in) return;
+    if (c == LV_EVENT_RELEASED) { g_home_armed = false; return; }
+    if (c != LV_EVENT_PRESSED) return;
+    lv_obj_t *zone = home_zone_of_active(NULL);
+    g_home_armed = false;
+    if (!zone) return;
     lv_point_t p;
     lv_indev_get_point(in, &p);
-    if (c == LV_EVENT_PRESSED) { g_home_start = p; g_home_done = false; return; }
-    if (c != LV_EVENT_PRESSING || g_home_done) return;
+    lv_area_t a;
+    lv_obj_get_coords(zone, &a);
+    if (p.y < a.y1) return;                      // касание началось выше полосы: это обычное нажатие или прокрутка
+    g_home_in = in;
+    g_home_start = p;
+    g_home_done = false;
+    g_home_armed = true;
+}
+
+static void home_timer_cb(lv_timer_t *t)
+{
+    LV_UNUSED(t);
+    if (!g_home_armed || g_home_done || !g_home_in) return;
+    if (lv_indev_get_state(g_home_in) != LV_INDEV_STATE_PRESSED) { g_home_armed = false; return; }
+    lv_point_t p;
+    lv_indev_get_point(g_home_in, &p);
     int dy = g_home_start.y - p.y, dx = p.x - g_home_start.x;
     if (dy >= HOME_SWIPE_MIN && dy > (dx < 0 ? -dx : dx)) {      // вверх и скорее вертикально, чем вбок
+        lv_event_cb_t cb = NULL;
+        if (!home_zone_of_active(&cb) || !cb) { g_home_armed = false; return; }
         g_home_done = true;
-        lv_indev_wait_release(in);                                // остаток движения не должен нажать кнопку под пальцем
-        lv_event_cb_t cb = lv_event_get_user_data(e);
+        g_home_armed = false;
+        lv_indev_wait_release(g_home_in);                         // остаток движения не должен нажать кнопку под пальцем
         g_exit_up = true;
-        if (cb) cb(e);                                            // анимацию выбирают внутри cb, синхронно
+        cb(NULL);                                                 // анимацию выбирают внутри cb, синхронно
         g_exit_up = false;
     }
+}
+
+static void home_swipe_register(void)
+{
+    if (g_home_timer) return;
+    lv_indev_t *in = lv_indev_get_next(NULL);
+    if (!in) return;                                              // устройство ввода ещё не создано - повторим при следующем экране
+    for (; in; in = lv_indev_get_next(in)) {
+        lv_indev_add_event_cb(in, home_indev_cb, LV_EVENT_PRESSED, NULL);
+        lv_indev_add_event_cb(in, home_indev_cb, LV_EVENT_RELEASED, NULL);
+    }
+    g_home_timer = lv_timer_create(home_timer_cb, 30, NULL);
 }
 
 lv_screen_load_anim_t sys_exit_anim(void)
@@ -388,13 +448,14 @@ lv_screen_load_anim_t sys_exit_anim(void)
 
 static void add_home_bar(lv_obj_t *scr, lv_event_cb_t exit_cb)
 {
+    home_swipe_register();
     lv_obj_t *zone = lv_obj_create(scr);
     lv_obj_remove_style_all(zone);
-    lv_obj_remove_flag(zone, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(zone, LV_OBJ_FLAG_FLOATING | LV_OBJ_FLAG_CLICKABLE);   // вне flex-раскладки экрана, поверх содержимого
+    lv_obj_remove_flag(zone, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);   // не перехватывает нажатия (см. выше)
+    lv_obj_add_flag(zone, LV_OBJ_FLAG_FLOATING);                // вне flex-раскладки экрана, поверх содержимого
     lv_obj_set_size(zone, lv_pct(100), HOME_BAR_H);
     lv_obj_align(zone, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_add_event_cb(zone, home_swipe_cb, LV_EVENT_ALL, exit_cb);
+    lv_obj_add_event_cb(zone, home_zone_marker_cb, LV_EVENT_DELETE, exit_cb);
     lv_obj_t *pill = lv_obj_create(zone);
     lv_obj_remove_style_all(pill);
     lv_obj_remove_flag(pill, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
