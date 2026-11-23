@@ -21,37 +21,37 @@ void sys_ui_init(void)
 // Третья страница: цифры, знаки, курсор, Aa (заглавная на одну букву) и смена языка.
 #define BKSP LV_SYMBOL_BACKSPACE
 
-typedef struct { const char *t; uint8_t w; } key_t;     // t == NULL - конец строки клавиш; t == "" и w == 0 - конец раскладки
-#define ROW         { NULL, 0 }
-#define END         { "", 0 }
+typedef struct { const char *t; uint8_t w; } kb_key_t;     // t == NULL - конец строки клавиш; t == "" и w == 0 - конец раскладки
+#define KB_ROW         { NULL, 0 }
+#define KB_END         { "", 0 }
 
-static const key_t en_a[] = {      // a-m
-    {"a",1},{"b",1},{"c",1},{"d",1},{"e",1}, ROW,
-    {"f",1},{"g",1},{"h",1},{"i",1},{"j",1}, ROW,
-    {"k",1},{"l",1},{"m",1},{BKSP,2}, ROW,
-    {"n-z",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, END };
-static const key_t en_b[] = {      // n-z
-    {"n",1},{"o",1},{"p",1},{"q",1},{"r",1}, ROW,
-    {"s",1},{"t",1},{"u",1},{"v",1},{"w",1}, ROW,
-    {"x",1},{"y",1},{"z",1},{BKSP,2}, ROW,
-    {"a-m",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, END };
-static const key_t ru_a[] = {      // а-п
-    {"а",1},{"б",1},{"в",1},{"г",1},{"д",1},{"е",1}, ROW,
-    {"ё",1},{"ж",1},{"з",1},{"и",1},{"й",1},{"к",1}, ROW,
-    {"л",1},{"м",1},{"н",1},{"о",1},{"п",1},{BKSP,1}, ROW,
-    {"р-я",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, END };
-static const key_t ru_b[] = {      // р-я
-    {"р",1},{"с",1},{"т",1},{"у",1},{"ф",1},{"х",1}, ROW,
-    {"ц",1},{"ч",1},{"ш",1},{"щ",1},{"ъ",1},{"ы",1}, ROW,
-    {"ь",1},{"э",1},{"ю",1},{"я",1},{BKSP,2}, ROW,
-    {"а-п",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, END };
-static const key_t sym[] = {
-    {"1",1},{"2",1},{"3",1},{"4",1},{"5",1}, ROW,
-    {"6",1},{"7",1},{"8",1},{"9",1},{"0",1}, ROW,
-    {".",1},{",",1},{"!",1},{"?",1},{"-",1}, ROW,
-    {"@",1},{":",1},{"_",1},{"/",1},{"#",1}, ROW,
-    {LV_SYMBOL_LEFT,1},{LV_SYMBOL_RIGHT,1},{"Aa",1},{"@LANG",1},{BKSP,1}, ROW,
-    {"abc",1},{" ",3},{LV_SYMBOL_OK,1}, END };
+static const kb_key_t kb_en_a[] = {      // a-m
+    {"a",1},{"b",1},{"c",1},{"d",1},{"e",1}, KB_ROW,
+    {"f",1},{"g",1},{"h",1},{"i",1},{"j",1}, KB_ROW,
+    {"k",1},{"l",1},{"m",1},{BKSP,2}, KB_ROW,
+    {"n-z",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_en_b[] = {      // n-z
+    {"n",1},{"o",1},{"p",1},{"q",1},{"r",1}, KB_ROW,
+    {"s",1},{"t",1},{"u",1},{"v",1},{"w",1}, KB_ROW,
+    {"x",1},{"y",1},{"z",1},{BKSP,2}, KB_ROW,
+    {"a-m",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_ru_a[] = {      // а-п
+    {"а",1},{"б",1},{"в",1},{"г",1},{"д",1},{"е",1}, KB_ROW,
+    {"ё",1},{"ж",1},{"з",1},{"и",1},{"й",1},{"к",1}, KB_ROW,
+    {"л",1},{"м",1},{"н",1},{"о",1},{"п",1},{BKSP,1}, KB_ROW,
+    {"р-я",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_ru_b[] = {      // р-я
+    {"р",1},{"с",1},{"т",1},{"у",1},{"ф",1},{"х",1}, KB_ROW,
+    {"ц",1},{"ч",1},{"ш",1},{"щ",1},{"ъ",1},{"ы",1}, KB_ROW,
+    {"ь",1},{"э",1},{"ю",1},{"я",1},{BKSP,2}, KB_ROW,
+    {"а-п",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_sym[] = {
+    {"1",1},{"2",1},{"3",1},{"4",1},{"5",1}, KB_ROW,
+    {"6",1},{"7",1},{"8",1},{"9",1},{"0",1}, KB_ROW,
+    {".",1},{",",1},{"!",1},{"?",1},{"-",1}, KB_ROW,
+    {"@",1},{":",1},{"_",1},{"/",1},{"#",1}, KB_ROW,
+    {LV_SYMBOL_LEFT,1},{LV_SYMBOL_RIGHT,1},{"Aa",1},{"@LANG",1},{BKSP,1}, KB_ROW,
+    {"abc",1},{" ",3},{LV_SYMBOL_OK,1}, KB_END };
 
 #define KB_MAX_KEYS 48
 static const char *kb_map[KB_MAX_KEYS + 16];            // метки и "\n" между строками, в конце ""
@@ -61,14 +61,14 @@ static int  kb_page;                                    // 0 - первая по
 static int  kb_lpage;                                   // последняя страница с буквами (куда возвращает "abc")
 static bool kb_shift;                                   // следующая буква заглавная
 
-static bool is_letter(const char *t)
+static bool kb_is_letter(const char *t)
 {
     unsigned char c = (unsigned char)t[0];
     if (t[1] == '\0') return c >= 'a' && c <= 'z';
     return (c == 0xD0 || c == 0xD1) && t[2] == '\0';     // кириллица в UTF-8: 2 байта
 }
 
-static void to_upper(const char *t, char *out)
+static void kb_to_upper(const char *t, char *out)
 {
     unsigned char c = (unsigned char)t[0], d = (unsigned char)t[1];
     if (d == '\0') { out[0] = (char)(c - 32); out[1] = '\0'; return; }
@@ -81,15 +81,15 @@ static void to_upper(const char *t, char *out)
 
 static void kb_apply(void)
 {
-    const key_t *tbl = kb_page == 2 ? sym : kb_lang ? (kb_page ? ru_b : ru_a) : (kb_page ? en_b : en_a);
+    const kb_key_t *tbl = kb_page == 2 ? kb_sym : kb_lang ? (kb_page ? kb_ru_b : kb_ru_a) : (kb_page ? kb_en_b : kb_en_a);
     int n = 0, nk = 0;
-    for (const key_t *k = tbl; k->w || k->t == NULL || k->t[0]; k++) {
+    for (const kb_key_t *k = tbl; k->w || k->t == NULL || k->t[0]; k++) {
         if (!k->t) { kb_map[n++] = "\n"; continue; }
         if (nk >= KB_MAX_KEYS) break;
         const char *t = k->t;
         lv_buttonmatrix_ctrl_t ctrl = LV_BUTTONMATRIX_CTRL_NO_REPEAT | LV_BUTTONMATRIX_CTRL_CLICK_TRIG | k->w;
         if (strcmp(t, "@LANG") == 0) { t = kb_lang ? "EN" : "RU"; }
-        else if (kb_shift && is_letter(t)) { to_upper(t, kb_txt[nk]); t = kb_txt[nk]; }
+        else if (kb_shift && kb_is_letter(t)) { kb_to_upper(t, kb_txt[nk]); t = kb_txt[nk]; }
         else if (strcmp(t, "Aa") == 0 && kb_shift) ctrl |= LV_BUTTONMATRIX_CTRL_CHECKED;
         kb_map[n++] = t;
         kb_ctrl[nk++] = ctrl;
