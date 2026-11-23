@@ -13,6 +13,7 @@
 #include "esp_codec_dev.h"
 #include "bsp/esp32_s3_touch_amoled_2_06.h"
 #include "watch/audio.h"
+#include "driver/i2s_std.h"
 
 static const char *TAG = "audio_esp";
 
@@ -225,8 +226,21 @@ static void hw_rec_resume(void) { s_rec_pause = false; }
 
 esp_err_t audio_esp_init(void)
 {
-    esp_err_t e = bsp_audio_init_voice_24k();
+    const i2s_std_config_t i2s_cfg = {
+        .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(BUS_RATE),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
+                                                        I2S_SLOT_MODE_STEREO),
+        .gpio_cfg = {
+            .mclk = BSP_I2S_MCLK,
+            .bclk = BSP_I2S_SCLK,
+            .ws   = BSP_I2S_LCLK,
+            .dout = BSP_I2S_DOUT,
+            .din  = BSP_I2S_DSIN,
+        },
+    };
+    esp_err_t e = bsp_audio_init(&i2s_cfg);
     if (e != ESP_OK) { ESP_LOGE(TAG, "аудиошина: %s", esp_err_to_name(e)); return e; }
+
     s_spk = bsp_audio_codec_speaker_init();
     s_mic = bsp_audio_codec_microphone_init();
     if (!s_spk || !s_mic) { ESP_LOGE(TAG, "кодек динамика/микрофона не создан"); return ESP_FAIL; }
