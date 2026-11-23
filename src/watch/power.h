@@ -14,6 +14,7 @@ void power_preview_brightness(int brightness_pct);                      // пр�
 
 bool power_dimmed(void);
 bool power_screen_off(void);
+void power_sleep_now(void);                             // выключить экран сразу (кнопка питания); разбудит касание или power_wake()
 void power_wake(void);                                  // включить экран и сбросить таймер бездействия
 
 // Вызывается, когда экран включается после полного выключения (не после затемнения): циферблат показывается заново.

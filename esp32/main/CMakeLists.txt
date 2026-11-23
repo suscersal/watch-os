@@ -6,7 +6,7 @@ list(FILTER WATCH_CORE EXCLUDE REGEX "plat_posix\\.c$|net_curl\\.c$|wifi_ctl_pos
 
 idf_component_register(
     SRCS
-        main.c wifi.c net_esp.c plat_esp.c
+        main.c wifi.c net_esp.c plat_esp.c audio_esp.c buttons_esp.c
         ${WATCH_ROOT}/src/launcher.c
         ${WATCH_CORE}
     INCLUDE_DIRS . ${WATCH_ROOT}/src

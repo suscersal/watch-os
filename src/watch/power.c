@@ -18,6 +18,7 @@ static int     g_dim_s = 30, g_off_s = 60, g_bright = CONFIG_WATCH_BRIGHTNESS;
 static state_t g_state = ST_ON;
 static lv_obj_t   *g_overlay;
 static lv_timer_t *g_timer;
+static bool      g_forced_off;      // экран выключен кнопкой: таймер бездействия его не включает
 static void      (*g_backend)(int);
 static void      (*g_wake_cb)(void);
 static char        g_path[96] = "data/power.json";
@@ -58,7 +59,8 @@ static void tick_cb(lv_timer_t *t)
     LV_UNUSED(t);
     uint32_t idle = lv_display_get_inactive_time(NULL) / 1000;
     state_t want = ST_ON;
-    if (g_off_s && idle >= (uint32_t)g_off_s)      want = ST_OFF;
+    if (g_forced_off) want = ST_OFF;
+    else if (g_off_s && idle >= (uint32_t)g_off_s)      want = ST_OFF;
     else if (g_dim_s && idle >= (uint32_t)g_dim_s) want = ST_DIM;
     set_state(want);
 }
@@ -150,8 +152,15 @@ void power_preview_brightness(int brightness_pct)
 bool power_dimmed(void)     { return g_state == ST_DIM; }
 bool power_screen_off(void) { return g_state == ST_OFF; }
 
+void power_sleep_now(void)
+{
+    g_forced_off = true;
+    set_state(ST_OFF);
+}
+
 void power_wake(void)
 {
+    g_forced_off = false;
     lv_display_trigger_activity(NULL);
     set_state(ST_ON);
 }
