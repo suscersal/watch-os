@@ -43,7 +43,7 @@ void messages_add(uint32_t id, uint32_t ts, const char *app, const char *title, 
 
     power_wake();                                      // включить экран; при блокировке виден только экран PIN
     if (!lock_screen_is_locked()) {
-        char t[96];
+        char t[128];
         snprintf(t, sizeof t, "%s%s%s", m->app, m->app[0] && m->title[0] ? ": " : "", m->title[0] ? m->title : (m->app[0] ? "" : "Message"));
         sys_toast(t);
     }

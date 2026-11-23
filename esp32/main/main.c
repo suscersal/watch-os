@@ -11,6 +11,7 @@
 #include "wifi.h"
 #include "audio_esp.h"
 #include "buttons_esp.h"
+#include "perf_esp.h"
 #include "imu_esp.h"
 #include "watch/clock.h"
 #include "watch/power.h"
@@ -78,6 +79,7 @@ void app_main(void)
         ESP_LOGE(TAG, "display init failed");
         return;
     }
+    if (bsp_display_lock(0)) { perf_esp_start(disp); bsp_display_unlock(); }   // замер отрисовки, если включено CONFIG_WATCH_PERF_LOG
     // После инициализации BSP яркость равна 0: без явной установки экран остаётся чёрным.
     // Яркостью дальше управляет watch/power (затемнение и выключение при бездействии, меню Display).
     power_set_backend(set_brightness);
