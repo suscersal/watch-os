@@ -1,5 +1,5 @@
 // icon_data.c - СГЕНЕРИРОВАНО tools/gen_icon_data.py из assets/icons/*.svg. Не править руками.
-#include "watch/icon_data.h"
+#include "icon_data.h"
 
 static const uint8_t ico_audio_data[] = {
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

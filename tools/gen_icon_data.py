@@ -7,7 +7,7 @@ from PIL import Image
 
 SIZE = 112
 out = ['// icon_data.c - СГЕНЕРИРОВАНО tools/gen_icon_data.py из assets/icons/*.svg. Не править руками.',
-       '#include "watch/icon_data.h"', '']
+       '#include "icon_data.h"', '']
 keys = []
 for path in sorted(glob.glob("assets/icons/*.svg")):
     key = os.path.splitext(os.path.basename(path))[0]
