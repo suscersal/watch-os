@@ -18,3 +18,4 @@ android/local.properties
 *.apk
 *.aab
 *.patch
+*.log
