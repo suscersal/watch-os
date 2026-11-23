@@ -17,7 +17,8 @@ void sys_ui_init(void)
 }
 
 // ---------- клавиатура с крупными клавишами ----------
-// Буквы делятся на две страницы: первая половина алфавита сразу, вторая - после нажатия кнопки "n-z" / "а-п" и т.п.
+// Раскладка обычная (QWERTY / ЙЦУКЕН), каждый ряд разрезан пополам: на первой странице левые половины рядов,
+// после нажатия ">>" - правые, "<<" возвращает назад. Так клавиши остаются крупными, а буквы - там, где их ждут пальцы.
 // Третья страница: цифры, знаки, курсор, Aa (заглавная на одну букву) и смена языка.
 #define BKSP LV_SYMBOL_BACKSPACE
 
@@ -25,26 +26,26 @@ typedef struct { const char *t; uint8_t w; } kb_key_t;     // t == NULL - кон
 #define KB_ROW         { NULL, 0 }
 #define KB_END         { "", 0 }
 
-static const kb_key_t kb_en_a[] = {      // a-m
-    {"a",1},{"b",1},{"c",1},{"d",1},{"e",1}, KB_ROW,
-    {"f",1},{"g",1},{"h",1},{"i",1},{"j",1}, KB_ROW,
-    {"k",1},{"l",1},{"m",1},{BKSP,2}, KB_ROW,
-    {"n-z",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
-static const kb_key_t kb_en_b[] = {      // n-z
-    {"n",1},{"o",1},{"p",1},{"q",1},{"r",1}, KB_ROW,
-    {"s",1},{"t",1},{"u",1},{"v",1},{"w",1}, KB_ROW,
-    {"x",1},{"y",1},{"z",1},{BKSP,2}, KB_ROW,
-    {"a-m",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
-static const kb_key_t kb_ru_a[] = {      // а-п
-    {"а",1},{"б",1},{"в",1},{"г",1},{"д",1},{"е",1}, KB_ROW,
-    {"ё",1},{"ж",1},{"з",1},{"и",1},{"й",1},{"к",1}, KB_ROW,
-    {"л",1},{"м",1},{"н",1},{"о",1},{"п",1},{BKSP,1}, KB_ROW,
-    {"р-я",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
-static const kb_key_t kb_ru_b[] = {      // р-я
-    {"р",1},{"с",1},{"т",1},{"у",1},{"ф",1},{"х",1}, KB_ROW,
-    {"ц",1},{"ч",1},{"ш",1},{"щ",1},{"ъ",1},{"ы",1}, KB_ROW,
-    {"ь",1},{"э",1},{"ю",1},{"я",1},{BKSP,2}, KB_ROW,
-    {"а-п",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_en_a[] = {      // левая половина: q w e r t / a s d f g / z x c v
+    {"q",1},{"w",1},{"e",1},{"r",1},{"t",1}, KB_ROW,
+    {"a",1},{"s",1},{"d",1},{"f",1},{"g",1}, KB_ROW,
+    {"z",1},{"x",1},{"c",1},{"v",1},{BKSP,1}, KB_ROW,
+    {">>",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_en_b[] = {      // правая половина: y u i o p / h j k l ' / b n m
+    {"y",1},{"u",1},{"i",1},{"o",1},{"p",1}, KB_ROW,
+    {"h",1},{"j",1},{"k",1},{"l",1},{"'",1}, KB_ROW,
+    {"b",1},{"n",1},{"m",1},{BKSP,2}, KB_ROW,
+    {"<<",1},{" ",2},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_ru_a[] = {      // левая половина: й ц у к е н / ф ы в а п р / я ч с м и
+    {"й",1},{"ц",1},{"у",1},{"к",1},{"е",1},{"н",1}, KB_ROW,
+    {"ф",1},{"ы",1},{"в",1},{"а",1},{"п",1},{"р",1}, KB_ROW,
+    {"я",1},{"ч",1},{"с",1},{"м",1},{"и",1},{BKSP,1}, KB_ROW,
+    {">>",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
+static const kb_key_t kb_ru_b[] = {      // правая половина: г ш щ з х ъ / о л д ж э ё / т ь б ю
+    {"г",1},{"ш",1},{"щ",1},{"з",1},{"х",1},{"ъ",1}, KB_ROW,
+    {"о",1},{"л",1},{"д",1},{"ж",1},{"э",1},{"ё",1}, KB_ROW,
+    {"т",1},{"ь",1},{"б",1},{"ю",1},{BKSP,2}, KB_ROW,
+    {"<<",1},{" ",3},{"123",1},{LV_SYMBOL_OK,1}, KB_END };
 static const kb_key_t kb_sym[] = {
     {"1",1},{"2",1},{"3",1},{"4",1},{"5",1}, KB_ROW,
     {"6",1},{"7",1},{"8",1},{"9",1},{"0",1}, KB_ROW,
@@ -57,7 +58,7 @@ static const kb_key_t kb_sym[] = {
 static const char *kb_map[KB_MAX_KEYS + 16];            // метки и "\n" между строками, в конце ""
 static lv_buttonmatrix_ctrl_t kb_ctrl[KB_MAX_KEYS];
 static char kb_txt[KB_MAX_KEYS][4];                     // заглавные буквы и подпись языка
-static int  kb_page;                                    // 0 - первая половина алфавита, 1 - вторая, 2 - цифры и знаки
+static int  kb_page;                                    // 0 - левые половины рядов, 1 - правые, 2 - цифры и знаки
 static int  kb_lpage;                                   // последняя страница с буквами (куда возвращает "abc")
 static bool kb_shift;                                   // следующая буква заглавная
 
@@ -73,9 +74,9 @@ static void kb_to_upper(const char *t, char *out)
     unsigned char c = (unsigned char)t[0], d = (unsigned char)t[1];
     if (d == '\0') { out[0] = (char)(c - 32); out[1] = '\0'; return; }
     out[0] = (char)0xD0;
-    if (c == 0xD0)      out[1] = (char)(d - 0x20);      // а-п -> А-П
+    if (c == 0xD0)      out[1] = (char)(d - 0x20);      // а-п (0xD0 0xB0-0xBF) -> А-П
     else if (d == 0x91) out[1] = (char)0x81;             // ё -> Ё
-    else                out[1] = (char)(d + 0x20);       // р-я -> Р-Я
+    else                out[1] = (char)(d + 0x20);       // р-я (0xD1 0x80-0x8F) -> Р-Я
     out[2] = '\0';
 }
 
@@ -115,8 +116,8 @@ static void kb_key_cb(lv_event_t *e)
     strncpy(key, t, sizeof key - 1);
     key[sizeof key - 1] = '\0';
 
-    if (strcmp(key, "n-z") == 0 || strcmp(key, "a-m") == 0 || strcmp(key, "р-я") == 0 || strcmp(key, "а-п") == 0) {
-        kb_page = kb_lpage = kb_page ? 0 : 1;                                 // другая половина алфавита
+    if (strcmp(key, ">>") == 0 || strcmp(key, "<<") == 0) {
+        kb_page = kb_lpage = kb_page ? 0 : 1;                                 // другая половина раскладки
         kb_apply();
     }
     else if (strcmp(key, "123") == 0)         { kb_lpage = kb_page; kb_page = 2; kb_apply(); }
