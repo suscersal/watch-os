@@ -1,4 +1,5 @@
 #include "hal.h"
+#include "emu_slow.h"
 
 
 lv_display_t * sdl_hal_init(int32_t w, int32_t h)
@@ -12,6 +13,7 @@ lv_display_t * sdl_hal_init(int32_t w, int32_t h)
   lv_indev_set_group(mouse, lv_group_get_default());
   lv_indev_set_display(mouse, disp);
   lv_display_set_default(disp);
+  emu_slow_attach(disp);      /* скорость отрисовки как на плате; WATCH_EMU_SLOW=1 отключает */
   /*Declare the image file.*/
   LV_IMAGE_DECLARE(mouse_cursor_icon); 
   lv_obj_t * cursor_obj;

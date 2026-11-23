@@ -115,8 +115,6 @@ void watchface_show(lv_obj_t *launcher)
     lv_obj_add_event_cb(g_face, face_event_cb, LV_EVENT_GESTURE, NULL);
     lv_obj_add_event_cb(g_face, face_deleted_cb, LV_EVENT_DELETE, NULL);
 
-    statusbar_create(g_face, false);
-
     g_time = lv_label_create(g_face);
     lv_obj_set_style_text_font(g_time, WATCH_FONT_TIME, 0);
     lv_obj_set_style_text_color(g_time, lv_color_white(), 0);

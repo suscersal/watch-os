@@ -7,6 +7,7 @@
 #include "watch/app_runtime.h"
 #include "watch/sys_ui.h"
 #include "watch/storage.h"
+#include "watch/buttons.h"
 #include "watch/messages.h"
 #include "watch/power.h"
 #include "watch/watchface.h"
@@ -364,6 +365,18 @@ int main(void)
     for (uint32_t i = 0; i < 25; i++) messages_add(i, 0, "App", "Title", "Text");
     CHECK(messages_count() == MSG_MAX && messages_get(0)->id == 24, "message list keeps the newest 20");
     messages_clear();
+
+    // кнопки корпуса: PWR гасит и будит экран, BOOT возвращает домой
+    watchface_hide(false);
+    buttons_pwr_short(); pump(30);
+    CHECK(power_screen_off(), "PWR short turns the screen off");
+    buttons_boot_short(); pump(30);
+    CHECK(!power_screen_off(), "BOOT on a sleeping screen wakes it");
+    CHECK(watchface_visible(), "waking up shows the watch face");
+    watchface_hide(false);
+    buttons_boot_short(); pump(30);
+    CHECK(watchface_visible(), "BOOT on the app grid shows the watch face");
+    watchface_hide(false);
 
     tools_flow(launcher);
     keyboard_flow(launcher);

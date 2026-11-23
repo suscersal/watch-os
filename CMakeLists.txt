@@ -40,6 +40,7 @@ add_executable(main
     src/main.c
     src/launcher.c
     src/hal/hal.c
+    src/hal/emu_slow.c
     src/mouse_cursor_icon.c
     ${WATCH_SOURCES}
     ${CJSON_SRC})

@@ -2,6 +2,8 @@ name: ESP32 firmware
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
     paths:
       - 'esp32/**'
       - 'src/**'
@@ -10,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # нужно только для выкладки в Releases по тегу
+  contents: write   # нужно для создания релиза
 
 jobs:
   build:
@@ -30,18 +32,38 @@ jobs:
           # MissingKconfigError (LV_USE_FREETYPE), потому что Kconfig LVGL ещё не скачан. В новых 2.x это обработано.
           command: pip install -U "idf-component-manager>=2.4,<3" && idf.py build && idf.py merge-bin -o watch-os-full.bin
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: watch-os-firmware
-          path: |
-            esp32/build/watch-os-full.bin
-            esp32/build/watch_os.bin
-            esp32/build/bootloader/bootloader.bin
-            esp32/build/partition_table/partition-table.bin
-            esp32/build/storage.bin
+      # Артефакты не нужны: сборка сразу становится релизом.
+      # Тег v* (git tag v0.1.0 && git push --tags) - обычный релиз; любая другая сборка ветки main - пред-релиз build-<коммит>.
+      # Прошивка и APK одного коммита попадают в один и тот же релиз (тег общий).
+      - name: Release tag
+        id: rel
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "pre=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=build-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "pre=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Publish release (только для тегов v*)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish release
+        if: steps.rel.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          files: esp32/build/watch-os-full.bin
+          tag_name: ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.rel.outputs.tag }}
+          prerelease: ${{ steps.rel.outputs.pre == 'true' }}
+          body: |
+            Прошивка часов Waveshare ESP32-S3-Touch-AMOLED-2.06.
+
+            **Прошить целиком** (образ собран командой `idf.py merge-bin`):
+            ```
+            esptool.py --chip esp32s3 -p <порт> write_flash 0x0 watch-os-full.bin
+            ```
+            Коммит: ${{ github.sha }}
+          files: |
+            esp32/build/watch-os-full.bin
+            esp32/build/watch_os.bin
+            esp32/build/storage.bin

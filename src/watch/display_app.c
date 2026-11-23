@@ -54,6 +54,11 @@ static void dropdown_cb(lv_event_t *e)
     power_set_settings(dim, off, br);            // при конфликте (off не позже dim) power сам поправит off
 }
 
+static void raise_cb(lv_event_t *e)
+{
+    power_set_raise(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
+}
+
 static void add_dropdown(const char *title, const char *options, const int *opts, int current)
 {
     lv_obj_t *h = lv_label_create(body);
@@ -94,6 +99,18 @@ void display_open(lv_obj_t *launcher)
 
     add_dropdown("Dim after", "Never\n15 s\n30 s\n1 min\n5 min", dim_opts, dim);
     add_dropdown("Screen off after", "Never\n30 s\n1 min\n5 min\n10 min", off_opts, off);
+
+    lv_obj_t *row = lv_obj_create(body);                       // «Raise to wake»: экран включается при подъёме руки
+    lv_obj_remove_style_all(row);
+    lv_obj_set_size(row, lv_pct(100), 44);
+    lv_obj_t *rl = lv_label_create(row);
+    lv_label_set_text(rl, "Raise to wake");
+    lv_obj_set_style_text_color(rl, lv_color_white(), 0);
+    lv_obj_align(rl, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_t *sw = lv_switch_create(row);
+    lv_obj_align(sw, LV_ALIGN_RIGHT_MID, 0, 0);
+    if (power_raise_enabled()) lv_obj_add_state(sw, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw, raise_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
     lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);   // лаунчер не удаляем
 }

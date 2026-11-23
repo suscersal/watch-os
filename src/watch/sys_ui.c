@@ -389,7 +389,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
         lv_obj_set_style_text_font(t, WATCH_FONT_BOLD_S, 0);
         lv_obj_set_style_text_color(t, lv_color_hex(ws_accent()), 0);
         lv_obj_align(t, LV_ALIGN_TOP_LEFT, 35, 29);
-        lv_obj_t *tm;
+        lv_obj_t *tm = NULL;
         if (right_text) {                                   // вместо времени свой текст (например, длительность таймера)
             tm = lv_label_create(bar);
             lv_label_set_text(tm, right_text);
@@ -399,9 +399,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
             lv_obj_set_width(tm, 130);
             lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -33, 28);
         } else {
-            tm = ws_time_label(bar);
-            lv_obj_set_style_text_font(tm, WATCH_FONT_BOLD_S, 0);
-            lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -33, 29);
+            tm = NULL;                                      // время показывает общая строка состояния
         }
         g_right_lbl = tm;
         if (back_cb) {
@@ -409,9 +407,9 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
             lv_obj_set_user_data(scr, (void *)back_cb);       // для sys_screen_exit()
         }
     } else {
-        lv_obj_set_height(bar, 104);
+        lv_obj_set_height(bar, 110);
         lv_obj_t *back = ws_round_button(bar, 56, LV_SYMBOL_LEFT, WS_CARD, 0xFFFFFF, NULL, back_cb, NULL);
-        lv_obj_align(back, LV_ALIGN_TOP_LEFT, 24, 23);
+        lv_obj_align(back, LV_ALIGN_TOP_LEFT, 24, 29);   // ниже общей строки состояния
         lv_obj_t *t = lv_label_create(bar);
         lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
         lv_obj_set_width(t, 220);
@@ -419,7 +417,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
         lv_obj_set_style_text_font(t, WATCH_FONT_BOLD, 0);
         lv_obj_set_style_text_color(t, lv_color_white(), 0);
         lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(t, LV_ALIGN_TOP_MID, 28, 35);
+        lv_obj_align(t, LV_ALIGN_TOP_MID, 28, 41);
     }
 
     lv_obj_t *body = lv_obj_create(scr);

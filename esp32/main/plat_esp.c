@@ -24,13 +24,14 @@ bool plat_local_ip(char *buf, size_t n)
 
 // ---------- RTC PCF85063 (адрес 0x51) и питание AXP2101 (адрес 0x34) на общей шине I2C платы ----------
 // Шину создаёт BSP (дисплей и тач уже на ней). ПРОВЕРЬТЕ на плате: имена bsp_i2c_init()/bsp_i2c_get_handle() взяты из
-// стандартного esp-bsp; если в вашей версии BSP они называются иначе, поправьте только i2c_dev() ниже.
+// стандартного esp-bsp; если в вашей версии BSP они называются иначе, поправьте только plat_esp_i2c_dev() ниже.
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
+#include "plat_esp_i2c.h"
 #include <string.h>
 #include <time.h>
 
-static i2c_master_dev_handle_t i2c_dev(uint8_t addr, i2c_master_dev_handle_t *slot)
+i2c_master_dev_handle_t plat_esp_i2c_dev(uint8_t addr, i2c_master_dev_handle_t *slot)
 {
     if (*slot) return *slot;
     if (bsp_i2c_init() != ESP_OK) return NULL;                 // повторный вызов безвреден
@@ -40,6 +41,8 @@ static i2c_master_dev_handle_t i2c_dev(uint8_t addr, i2c_master_dev_handle_t *sl
 }
 
 static i2c_master_dev_handle_t g_rtc, g_pmu;
+
+i2c_master_dev_handle_t plat_esp_pmu(void) { return plat_esp_i2c_dev(0x34, &g_pmu); }   // AXP2101: одно устройство на всех (батарея, кнопка PWR)
 
 static uint8_t bcd2bin(uint8_t v) { return (uint8_t)((v >> 4) * 10 + (v & 0x0F)); }
 static uint8_t bin2bcd(uint8_t v) { return (uint8_t)(((v / 10) << 4) | (v % 10)); }
@@ -57,7 +60,7 @@ static int64_t days_from_civil(int y, unsigned m, unsigned d)
 
 bool plat_rtc_read(int64_t *epoch_utc)
 {
-    i2c_master_dev_handle_t d = i2c_dev(0x51, &g_rtc);
+    i2c_master_dev_handle_t d = plat_esp_i2c_dev(0x51, &g_rtc);
     if (!d) return false;
     uint8_t reg = 0x04, r[7];                                  // секунды, минуты, часы, день, день недели, месяц, год
     if (i2c_master_transmit_receive(d, &reg, 1, r, sizeof r, 100) != ESP_OK) return false;
@@ -71,7 +74,7 @@ bool plat_rtc_read(int64_t *epoch_utc)
 
 void plat_rtc_write(int64_t epoch_utc)
 {
-    i2c_master_dev_handle_t d = i2c_dev(0x51, &g_rtc);
+    i2c_master_dev_handle_t d = plat_esp_i2c_dev(0x51, &g_rtc);
     if (!d || epoch_utc < 946684800) return;
     time_t t = (time_t)epoch_utc;
     struct tm tm;
@@ -90,7 +93,7 @@ void plat_rtc_write(int64_t epoch_utc)
 
 bool plat_battery(int *pct, bool *charging)
 {
-    i2c_master_dev_handle_t d = i2c_dev(0x34, &g_pmu);
+    i2c_master_dev_handle_t d = plat_esp_i2c_dev(0x34, &g_pmu);
     if (!d) return false;
     uint8_t reg = 0x00, st1;                                   // STATUS1: бит 3 - батарея подключена
     if (i2c_master_transmit_receive(d, &reg, 1, &st1, 1, 50) != ESP_OK || !(st1 & 0x08)) return false;

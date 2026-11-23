@@ -14,6 +14,12 @@ void power_preview_brightness(int brightness_pct);                      // пр�
 
 bool power_dimmed(void);
 bool power_screen_off(void);
+bool power_screen_forced_off(void);                     // экран выключен кнопкой (а не по бездействию)
+// Пробуждение подъёмом руки: платформа зовёт power_raise_wake() (из потока LVGL), когда заметила подъём.
+// Будит только затемнённый или выключенный по бездействию экран, и только если опция включена.
+bool power_raise_enabled(void);
+void power_set_raise(bool on);                          // применяет и сохраняет
+void power_raise_wake(void);
 void power_sleep_now(void);                             // выключить экран сразу (кнопка питания); разбудит касание или power_wake()
 void power_wake(void);                                  // включить экран и сбросить таймер бездействия
 

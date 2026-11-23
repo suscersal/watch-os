@@ -30,6 +30,7 @@ static struct { tstate_t st; uint32_t remain_ms, t0; } T;
 static lv_obj_t *g_launcher, *scr, *frame, *right_lbl, *cap_lbl, *time_lbl, *status_lbl, *btn_reset, *btn_main, *main_lbl;
 static lv_timer_t *tick;      // обновляет экран, пока приложение открыто
 static lv_timer_t *bg;        // следит за концом отсчёта, даже когда приложение закрыто
+static void       (*g_change_cb)(void);
 static bool        g_inited;  // состояние T заводится один раз и переживает закрытие приложения
 #define MSG_ID_TIMER 0x54494D52u   // "TIMR": новый сигнал заменяет прежний в списке уведомлений
 
@@ -117,6 +118,8 @@ static void frame_draw_cb(lv_event_t *e)
     }
 }
 
+static void changed(void) { if (g_change_cb) g_change_cb(); }
+
 // ---------- конец отсчёта ----------
 // Время вышло: состояние DONE и уведомление (включает экран и показывает тост, если часы не заблокированы PIN).
 static void check_done(void)
@@ -129,6 +132,7 @@ static void check_done(void)
     snprintf(txt, sizeof txt, "Прошло: %s", len);
     int64_t now;
     messages_add(MSG_ID_TIMER, clock_utc(&now) ? (uint32_t)now : 0, "Таймер", "Время вышло", txt);
+    changed();
 }
 
 static void refresh(void);
@@ -194,6 +198,7 @@ static void main_cb(lv_event_t *e)
     case T_DONE:  start_from(total_ms()); break;
     }
     refresh();
+    changed();
 }
 
 static void reset_cb(lv_event_t *e)
@@ -202,6 +207,7 @@ static void reset_cb(lv_event_t *e)
     T.st = T_IDLE;
     T.remain_ms = total_ms();
     refresh();
+    changed();
 }
 
 static lv_obj_t *label(lv_obj_t *parent, const char *text, const lv_font_t *font, uint32_t color, int y, int w);
@@ -235,6 +241,7 @@ static void picker_done_cb(lv_event_t *e)
     T.st = T_IDLE;
     T.remain_ms = ms;
     picker_close();
+    changed();
 }
 
 static void picker_chip_cb(lv_event_t *e)
@@ -412,3 +419,36 @@ void timer_open(lv_obj_t *launcher)
     refresh();
     lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);
 }
+
+// ---------- управление извне ----------
+timer_state_t timer_state(void) { check_done(); return (timer_state_t)T.st; }
+uint32_t timer_total_ms(void)   { return total_ms(); }
+uint32_t timer_remaining_ms(void) { return T.st == T_IDLE ? total_ms() : remaining(); }
+
+void timer_pause(void)
+{
+    if (T.st != T_RUN) return;
+    T.remain_ms = remaining();
+    T.st = T_PAUSE;
+    refresh();
+    changed();
+}
+
+void timer_resume(void)
+{
+    if (T.st == T_PAUSE) start_from(T.remain_ms);
+    else if (T.st == T_DONE) start_from(total_ms());
+    else return;
+    refresh();
+    changed();
+}
+
+void timer_stop(void)
+{
+    T.st = T_IDLE;
+    T.remain_ms = total_ms();
+    refresh();
+    changed();
+}
+
+void timer_set_change_cb(void (*cb)(void)) { g_change_cb = cb; }

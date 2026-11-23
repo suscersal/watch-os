@@ -3,6 +3,7 @@
 #include "watch/lvgl_inc.h"
 #include "watch/app_manager.h"
 #include "watch/app_runtime.h"
+#include "watch/buttons.h"
 #include "watch/settings.h"
 #include "watch/statusbar.h"
 #include "watch/storage.h"
@@ -92,6 +93,7 @@ void watch_launcher_create(void)
     lv_obj_set_style_text_font(launcher, WATCH_FONT_BODY, 0);   // шрифт с кириллицей
 
     sys_ui_init();
+    statusbar_init();            // общая строка состояния поверх всего: время, таймер, Wi-Fi, заряд
     settings_init(WATCH_ROOT "data");        // часовой пояс, Wi-Fi, ключ API, уведомления
     auth_init(WATCH_ROOT "data");
     storage_init(WATCH_ROOT "data");         // хранилище приложений; папка data/ приложениям недоступна
@@ -102,6 +104,7 @@ void watch_launcher_create(void)
     app_manager_scan(WATCH_ROOT "apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
     build_grid();
     lock_screen_init();         // если задан PIN, стартуем заблокированными
+    buttons_init(launcher);     // кнопки корпуса
     sync_net_notify_apply();    // если включены уведомления с телефона - начать слушать порт
 }
 
@@ -180,11 +183,6 @@ static void build_grid(void)
         row++;
     }
 
-    // время в правом верхнем углу, как на Apple Watch (не прокручивается вместе с сеткой)
-    lv_obj_t *tm = ws_time_label(launcher);
-    lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -16, 8);
-
     lv_obj_update_layout(cont);
     fisheye_update(cont);
-    statusbar_create(launcher, false);     // Wi-Fi и батарея; время в лаунчере уже рисует его собственная метка
 }

@@ -1,6 +1,8 @@
 #include "power.h"
 #include "cJSON.h"
 #include "fs.h"
+#include "plat.h"
+#include "sys_ui.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +20,7 @@ static int     g_dim_s = 30, g_off_s = 60, g_bright = CONFIG_WATCH_BRIGHTNESS;
 static state_t g_state = ST_ON;
 static lv_obj_t   *g_overlay;
 static lv_timer_t *g_timer;
+static bool      g_raise = true;    // будить экран при подъёме руки (если платформа это умеет)
 static bool      g_forced_off;      // экран выключен кнопкой: таймер бездействия его не включает
 static void      (*g_backend)(int);
 static void      (*g_wake_cb)(void);
@@ -54,9 +57,27 @@ static void set_state(state_t s)
     if (prev == ST_OFF && s == ST_ON && g_wake_cb) g_wake_cb();
 }
 
+// Предупреждение о низком заряде: один раз на 15% и один раз на 5%; сбрасывается зарядкой или подъёмом выше 20%.
+static void battery_check(void)
+{
+    static uint32_t last;
+    static int warned;                                  // 0 - нет, 1 - показали 15%, 2 - показали 5%
+    uint32_t now = lv_tick_get();
+    if (last && now - last < 30000) return;
+    last = now;
+    int pct; bool chg;
+    if (!plat_battery(&pct, &chg)) return;
+    if (chg || pct > 20) { warned = 0; return; }
+    if (g_state == ST_OFF) return;                      // экран выключен: покажем, когда включится
+    char msg[40];
+    if (pct <= 5 && warned < 2)       { warned = 2; snprintf(msg, sizeof msg, "Battery %d%% - charge now", pct); sys_toast(msg); }
+    else if (pct <= 15 && warned < 1) { warned = 1; snprintf(msg, sizeof msg, "Battery low: %d%%", pct); sys_toast(msg); }
+}
+
 static void tick_cb(lv_timer_t *t)
 {
     LV_UNUSED(t);
+    battery_check();
     uint32_t idle = lv_display_get_inactive_time(NULL) / 1000;
     state_t want = ST_ON;
     if (g_forced_off) want = ST_OFF;
@@ -78,6 +99,7 @@ static void save(void)
     cJSON_AddNumberToObject(o, "dim", g_dim_s);
     cJSON_AddNumberToObject(o, "off", g_off_s);
     cJSON_AddNumberToObject(o, "brightness", g_bright);
+    cJSON_AddBoolToObject(o, "raise", g_raise);
     char *txt = cJSON_PrintUnformatted(o);
     if (txt) { fs_write_file(g_path, txt, strlen(txt)); free(txt); }
     cJSON_Delete(o);
@@ -151,6 +173,16 @@ void power_preview_brightness(int brightness_pct)
 
 bool power_dimmed(void)     { return g_state == ST_DIM; }
 bool power_screen_off(void) { return g_state == ST_OFF; }
+
+bool power_screen_forced_off(void) { return g_state == ST_OFF && g_forced_off; }
+bool power_raise_enabled(void)     { return g_raise; }
+void power_set_raise(bool on)      { g_raise = on; save(); }
+
+void power_raise_wake(void)
+{
+    if (!g_raise || g_forced_off) return;
+    if (g_state == ST_OFF || g_state == ST_DIM) power_wake();
+}
 
 void power_sleep_now(void)
 {

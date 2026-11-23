@@ -11,6 +11,7 @@
 #include "wifi.h"
 #include "audio_esp.h"
 #include "buttons_esp.h"
+#include "imu_esp.h"
 #include "watch/clock.h"
 #include "watch/power.h"
 #include "watch/settings.h"
@@ -82,6 +83,7 @@ void app_main(void)
     power_set_backend(set_brightness);
     if (audio_esp_init() != ESP_OK) ESP_LOGW(TAG, "audio disabled");   // динамик и микрофон; без них приложения работают вхолостую
     buttons_esp_start();                // BOOT = назад, PWR = экран вкл/выкл
+    imu_esp_start();                    // подъём руки будит экран
 
     if (!fs_ok) ESP_LOGW(TAG, "running without storage: no apps, PIN will not be saved");
 

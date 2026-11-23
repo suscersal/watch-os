@@ -44,7 +44,8 @@ void plat_rtc_write(int64_t epoch_utc) { (void)epoch_utc; }   // системн�
 bool plat_battery(int *pct, bool *charging)
 {
     const char *e = getenv("WATCH_BATTERY");
-    if (!e || !*e) return false;
+    if (!e) e = "87";                                   // по умолчанию в симуляторе показываем заряд, чтобы проверять интерфейс
+    if (!*e || strcmp(e, "off") == 0) return false;     // WATCH_BATTERY=off - как устройство без батареи
     int v = atoi(e);
     if (v < 0) v = 0;
     if (v > 100) v = 100;

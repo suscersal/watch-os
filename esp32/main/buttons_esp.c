@@ -10,8 +10,8 @@
 #include "freertos/task.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/esp32_s3_touch_amoled_2_06.h"
-#include "watch/power.h"
-#include "watch/sys_ui.h"
+#include "plat_esp_i2c.h"
+#include "watch/buttons.h"
 
 static const char *TAG = "buttons";
 
@@ -37,28 +37,25 @@ static bool pmu_write(uint8_t reg, uint8_t v)
 
 static void pmu_init(void)
 {
-    i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
-    if (!bus) { ESP_LOGW(TAG, "нет шины I2C: кнопка PWR отключена"); return; }
-    i2c_device_config_t dc = { .dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = AXP_ADDR, .scl_speed_hz = 400000 };
-    if (i2c_master_bus_add_device(bus, &dc, &s_pmu) != ESP_OK) { s_pmu = NULL; ESP_LOGW(TAG, "AXP2101 недоступен: кнопка PWR отключена"); return; }
+    s_pmu = plat_esp_pmu();                            // тот же дескриптор, что у индикатора батареи
+    if (!s_pmu) { ESP_LOGW(TAG, "AXP2101 недоступен: кнопка PWR отключена"); return; }
     uint8_t en = 0;
     if (pmu_read(AXP_INTEN2, &en)) pmu_write(AXP_INTEN2, en | PKEY_SHORT_BIT);
     pmu_write(AXP_INTSTS2, PKEY_SHORT_BIT);            // сбросить старое событие
 }
 
+// Что делает кнопка, решает общий код (watch/buttons.c): так же ведёт себя и симулятор.
 static void on_boot_short(void)
 {
     if (!bsp_display_lock(0)) return;
-    if (power_screen_off()) power_wake();
-    else sys_screen_exit(lv_screen_active());          // как свайп вправо; на главном экране ничего не делает
+    buttons_boot_short();
     bsp_display_unlock();
 }
 
 static void on_pwr_short(void)
 {
     if (!bsp_display_lock(0)) return;
-    if (power_screen_off()) power_wake();
-    else power_sleep_now();
+    buttons_pwr_short();
     bsp_display_unlock();
 }
 
@@ -89,5 +86,6 @@ static void buttons_task(void *arg)
 
 void buttons_esp_start(void)
 {
+    plat_esp_pmu();                                     // создать дескриптор AXP2101 сразу, пока нет гонки с индикатором батареи
     xTaskCreate(buttons_task, "buttons", 3072, NULL, 4, NULL);
 }
