@@ -17,6 +17,7 @@
 #include "watch/photos.h"
 #include "watch/sys_ui.h"
 #include "watch/watch_fonts.h"
+#include "watch/icon_data.h"
 
 // Корень файлов. ПК: относительно текущей папки. ESP32: "/flash/" (задаётся в CMake порта).
 #ifndef WATCH_ROOT
@@ -171,6 +172,15 @@ static void build_grid(void)
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_add_event_cb(btn, app_cb, LV_EVENT_CLICKED, (void *)app_manager_get(i));
 
+            const lv_image_dsc_t *img = icon_image(app_manager_get(i)->icon);
+            if (img) {   // готовая круглая иконка (assets/icons): кружок и глиф уже внутри картинки
+                lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+                lv_obj_set_style_border_width(btn, 0, 0);
+                lv_obj_t *im = lv_image_create(btn);
+                lv_image_set_src(im, img);
+                lv_obj_center(im);
+                continue;
+            }
             lv_obj_t *l = lv_label_create(btn);
             lv_label_set_text(l, app_icon_symbol(app_manager_get(i)->icon));
             lv_obj_set_style_text_color(l, lv_color_white(), 0);
