@@ -14,6 +14,7 @@
 /* clang-format off */
 #if 1
 
+#define LV_COLOR_DEPTH 16
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
