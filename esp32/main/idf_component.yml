@@ -1,5 +1,9 @@
 dependencies:
   idf: ">=5.4"
+  
+  # Явно указываем LVGL. esp_lvgl_port 2.9.0 стабильно работает с 9.2.x
+  lvgl/lvgl: "~9.2.0" 
+  
   waveshare/esp32_s3_touch_amoled_2_06:
     version: "^2.0.0"
   joltwallet/littlefs:
