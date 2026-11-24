@@ -26,10 +26,19 @@ static bool        g_want_sync, g_want_notify;   // зачем поднят се
 
 static void set_nonblock(int fd) { fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK); }
 
+static char        g_drop[64];                    // причина последнего разрыва (показывается на экране Sync)
+
 static void drop_client(void)
 {
     if (g_cli >= 0) { close(g_cli); g_cli = -1; }
     sync_rx_close();
+}
+
+static void drop_with(const char *why)
+{
+    snprintf(g_drop, sizeof g_drop, "%s", why);
+    printf("[sync] drop: %s\n", g_drop);
+    drop_client();
 }
 
 static void io_send(const uint8_t *d, size_t n, void *ud)
@@ -58,25 +67,30 @@ static void poll_cb(lv_timer_t *t)
         setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
         g_cli = fd;
         g_cli_last = lv_tick_get();
+        g_drop[0] = '\0';
         sync_io_t io = { io_send, NULL };
         sync_rx_open(g_code, &io);
         return;
     }
 
     // Молчащий клиент не должен занимать единственное место: при фоновом приёме уведомлений порт открыт постоянно.
-    if (lv_tick_elaps(g_cli_last) > 20000) { drop_client(); return; }
+    if (lv_tick_elaps(g_cli_last) > 20000) { drop_with("idle for 20 s"); return; }
 
     uint8_t buf[8192];
     for (int i = 0; i < 8; i++) {           // не дольше ~64 КБ за один тик, чтобы интерфейс не замирал
         ssize_t r = recv(g_cli, buf, sizeof buf, 0);
         if (r > 0) {
             g_cli_last = lv_tick_get();
-            if (!sync_rx_feed(buf, (size_t)r)) { drop_client(); return; }
+            if (!sync_rx_feed(buf, (size_t)r)) { drop_with(sync_rx_close_reason()[0] ? sync_rx_close_reason() : "closed by protocol"); return; }
         } else if (r == 0) {
-            drop_client();
+            drop_with("phone closed first");
             return;
         } else {
-            if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) drop_client();
+            if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                char w[40];
+                snprintf(w, sizeof w, "recv error %d", errno);
+                drop_with(w);
+            }
             return;
         }
     }
@@ -125,6 +139,7 @@ void sync_net_stop(void)
 {
     g_want_sync = false;
     memset(g_code, 0, sizeof g_code);        // одноразовый код больше не действует
+    g_drop[0] = '\0';
     drop_client();                           // сессия с этим кодом закрывается; уведомления переподключатся сами
     if (!g_want_notify) server_close();
 }
@@ -141,3 +156,4 @@ bool sync_net_notify_apply(void)
 bool        sync_net_running(void) { return g_srv >= 0; }
 const char *sync_net_code(void)    { return g_code; }
 uint16_t    sync_net_port(void)    { return g_port; }
+const char *sync_net_last_drop(void) { return g_drop; }

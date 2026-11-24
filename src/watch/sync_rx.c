@@ -34,6 +34,7 @@ typedef struct {
 } sess_t;
 
 static sess_t        S;
+static const char   *g_why = "";          // почему sync_rx_feed()/on_frame() потребовали закрыть соединение (для диагностики)
 static char          g_notify_code[SYNC_CODE_LEN + 1];
 static sync_event_cb g_cb;
 static void         *g_cb_ud;
@@ -76,6 +77,7 @@ void sync_rx_open(const char *code, const sync_io_t *io)
 {
     sync_rx_close();
     memset(&S, 0, sizeof S);
+    g_why = "";
     S.open = true;
     snprintf(S.code, sizeof S.code, "%s", code);
     S.io = *io;
@@ -95,6 +97,7 @@ void sync_rx_close(void)
 }
 
 bool sync_rx_authenticated(void) { return S.open && S.authed; }
+const char *sync_rx_close_reason(void) { return g_why; }
 
 // Сравнение кода за постоянное время. Пустой код (одноразовый закрыт или уведомления выключены) никогда не совпадает.
 static bool code_match(const char *expect)
@@ -212,13 +215,14 @@ static void on_message(void)
 static bool on_frame(void)
 {
     bool locked = lock_screen_is_locked();
-    if (S.type == SYNC_T_BYE) return false;
+    if (S.type == SYNC_T_BYE) { g_why = "phone said bye"; return false; }
     if (S.type == SYNC_T_HELLO) {
         on_hello(locked);
-        return S.auth_fails < MAX_AUTH_FAILS;
+        if (S.auth_fails >= MAX_AUTH_FAILS) { g_why = locked ? "watch is locked" : "3 wrong codes"; return false; }
+        return true;
     }
-    if (locked && S.scope != SCOPE_MSG) { send_err(S.type, SYNC_E_LOCKED); return false; }
-    if (!S.authed) { send_err(S.type, SYNC_E_STATE); return false; }
+    if (locked && S.scope != SCOPE_MSG) { send_err(S.type, SYNC_E_LOCKED); g_why = "watch is locked"; return false; }
+    if (!S.authed) { send_err(S.type, SYNC_E_STATE); g_why = "frame before HELLO"; return false; }
     if (S.scope == SCOPE_MSG && S.type != SYNC_T_TIME && S.type != SYNC_T_MESSAGE) {
         send_err(S.type, SYNC_E_SCOPE);
         return true;
@@ -237,7 +241,7 @@ static bool on_frame(void)
 
 bool sync_rx_feed(const uint8_t *d, size_t n)
 {
-    if (!S.open) return false;
+    if (!S.open) { g_why = "no open session"; return false; }
     while (n > 0) {
         if (S.hdr_n < 5) {                          // читаем заголовок кадра
             S.hdr[S.hdr_n++] = *d++; n--;
@@ -245,13 +249,14 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
             S.type = S.hdr[0];
             S.len = rd32(S.hdr + 1);
             S.got = 0;
-            if (S.len > SYNC_MAX_FRAME) { send_err(S.type, SYNC_E_TOO_BIG); return false; }
+            if (S.len > SYNC_MAX_FRAME) { send_err(S.type, SYNC_E_TOO_BIG); g_why = "frame too big"; return false; }
             if (S.type != SYNC_T_PHOTO_DATA) {
                 free(S.payload);
                 S.payload = malloc(S.len ? S.len : 1);
-                if (!S.payload) return false;
+                if (!S.payload) { g_why = "out of memory"; return false; }
             } else if (!S.authed || !S.photo_active) {
                 send_err(S.type, SYNC_E_STATE);
+                g_why = "photo data without BEGIN";
                 return false;
             }
             if (S.len == 0) {                       // пустой кадр: сразу обработать
@@ -264,7 +269,7 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
         size_t take = S.len - S.got;                // читаем данные кадра
         if (take > n) take = n;
         if (S.type == SYNC_T_PHOTO_DATA) {
-            if (S.recv + take > S.thumb_n + S.full_n) { send_err(S.type, SYNC_E_TOO_BIG); photo_reset(); return false; }
+            if (S.recv + take > S.thumb_n + S.full_n) { send_err(S.type, SYNC_E_TOO_BIG); photo_reset(); g_why = "photo data overflow"; return false; }
             memcpy(S.buf + S.recv, d, take);
             S.recv += (uint32_t)take;
         } else {

@@ -31,4 +31,5 @@ void sync_rx_open(const char *code, const sync_io_t *io);   // началась 
 void sync_rx_close(void);                                    // сессия завершена (разрыв или закрытие)
 // Подаёт принятые байты. false - соединение нужно закрыть (ошибка протокола, 3 неверных кода, блокировка).
 bool sync_rx_feed(const uint8_t *data, size_t n);
+const char *sync_rx_close_reason(void);                     // короткий текст: почему последний кадр закрыл соединение
 bool sync_rx_authenticated(void);
