@@ -6,6 +6,12 @@
 #pragma once
 #include "lvgl_inc.h"
 
+typedef enum { BTN_BOOT, BTN_PWR } btn_id_t;
+
+// Тест кнопок: пока хук задан, короткие нажатия BOOT и PWR идут только в него (экран не гаснет, приложение не закрывается).
+// На выключенном экране кнопки по-прежнему только будят его. NULL - снять хук.
+void buttons_set_test_hook(void (*cb)(btn_id_t b));
+
 void buttons_init(lv_obj_t *launcher);   // один раз из лаунчера: нужен, чтобы отличать сетку от приложения
 void buttons_pwr_short(void);
 void buttons_boot_short(void);

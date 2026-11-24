@@ -3,6 +3,7 @@
 #include "cJSON.h"
 #include "installer.h"
 #include "display_app.h"
+#include "buttons_test_app.h"
 #include "music_app.h"
 #include "recorder_app.h"
 #include "timer_app.h"
@@ -202,6 +203,15 @@ size_t app_manager_scan(const char *root)
         snprintf(a->icon, sizeof a->icon, "settings");
         a->color = 0x3B82F6;
         a->builtin = settings_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_buttons");
+        snprintf(a->name, sizeof a->name, "Кнопки");
+        snprintf(a->icon, sizeof a->icon, "calc");
+        a->color = 0x8B5CF6;
+        a->builtin = buttons_test_open;
     }
     if (napps < APPS_MAX) {
         app_info_t *a = &apps[napps++];
