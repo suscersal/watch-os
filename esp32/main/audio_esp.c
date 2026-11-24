@@ -205,7 +205,7 @@ static bool hw_rec_start(const char *path)
     s_rec_stop = s_rec_pause = false;
     s_level = 0;
     s_rec_alive = true;
-    if (xTaskCreate(rec_task, "rec", 4096, r, 5, NULL) != pdPASS) {
+    if (xTaskCreate(rec_task, "rec", 8192, r, 5, NULL) != pdPASS) {
         s_rec_alive = false;
         esp_codec_dev_close(s_mic); fclose(f); free(r);
         return false;

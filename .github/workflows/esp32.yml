@@ -67,3 +67,4 @@ jobs:
             esp32/build/watch-os-full.bin
             esp32/build/watch_os.bin
             esp32/build/storage.bin
+            esp32/build/watch_os.elf
