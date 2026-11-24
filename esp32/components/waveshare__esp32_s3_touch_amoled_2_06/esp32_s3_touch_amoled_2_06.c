@@ -717,7 +717,7 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
             .mirror_y = false,
         },
         .flags = {
-            .sw_rotate = true,
+            .sw_rotate = false,   // поворот не используется; true выделяет третий буфер того же размера и не хватает внутренней RAM
             .buff_dma = cfg->flags.buff_dma,
             .buff_spiram = cfg->flags.buff_spiram,
 #if LVGL_VERSION_MAJOR >= 9
