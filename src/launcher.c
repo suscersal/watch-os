@@ -1,5 +1,6 @@
 // launcher.c - сотовая сетка иконок как на Apple Watch. LVGL 9.
 // Список приложений берётся из apps/*/manifest.json (см. watch/app_manager.c).
+#include <stdio.h>
 #include "watch/lvgl_inc.h"
 #include "watch/app_manager.h"
 #include "watch/app_runtime.h"
@@ -87,6 +88,7 @@ static void build_grid(void);
 
 void watch_launcher_create(void)
 {
+    printf("LTRACE 0: start\n");
     launcher = lv_screen_active();
     lv_obj_set_style_bg_color(launcher, lv_color_black(), 0);
     lv_obj_set_style_pad_all(launcher, 0, 0);
@@ -94,19 +96,33 @@ void watch_launcher_create(void)
     lv_obj_set_style_text_font(launcher, WATCH_FONT_BODY, 0);   // шрифт с кириллицей
 
     sys_ui_init();
+    printf("LTRACE 1 ok: sys_ui_init\n");
     statusbar_init();            // общая строка состояния поверх всего: время, таймер, Wi-Fi, заряд
+    printf("LTRACE 2 ok: statusbar_init\n");
     settings_init(WATCH_ROOT "data");        // часовой пояс, Wi-Fi, ключ API, уведомления
+    printf("LTRACE 3 ok: settings_init\n");
     auth_init(WATCH_ROOT "data");
+    printf("LTRACE 4 ok: auth_init\n");
     storage_init(WATCH_ROOT "data");         // хранилище приложений; папка data/ приложениям недоступна
+    printf("LTRACE 5 ok: storage_init\n");
     power_init(WATCH_ROOT "data");
+    printf("LTRACE 6 ok: power_init\n");
     music_init(WATCH_ROOT "data");           // музыка: data/music/*.wav
+    printf("LTRACE 7 ok: music_init\n");
     recorder_init(WATCH_ROOT "data");        // записи: data/rec
+    printf("LTRACE 8 ok: recorder_init\n");
     photos_init(WATCH_ROOT "data/photos");   // фото с телефона (Gallery)
+    printf("LTRACE 9 ok: photos_init\n");
     app_manager_scan(WATCH_ROOT "apps");   // приложения берутся из папки apps/ (manifest.json у каждого)
+    printf("LTRACE 10 ok: app_manager_scan\n");
     build_grid();
+    printf("LTRACE 11 ok: build_grid\n");
     lock_screen_init();         // если задан PIN, стартуем заблокированными
+    printf("LTRACE 12 ok: lock_screen_init\n");
     buttons_init(launcher);     // кнопки корпуса
+    printf("LTRACE 13 ok: buttons_init\n");
     sync_net_notify_apply();    // если включены уведомления с телефона - начать слушать порт
+    printf("LTRACE 14 ok: sync_net_notify_apply\n");
 }
 
 // Перестроить сетку после установки/удаления приложения.
