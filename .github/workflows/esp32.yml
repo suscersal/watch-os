@@ -22,8 +22,22 @@ jobs:
         with:
           submodules: recursive
 
+      # Кэш компилятора: git checkout ставит всем файлам новое время, и без ccache каждая сборка идёт с нуля.
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-esp32-${{ github.sha }}
+          restore-keys: ccache-esp32-
+
       - name: Build with ESP-IDF 5.5
         uses: espressif/esp-idf-ci-action@v1
+        env:
+          IDF_CCACHE_ENABLE: '1'
+          CCACHE_DIR: /github/workspace/.ccache
+          CCACHE_BASEDIR: /github/workspace
+          CCACHE_COMPILERCHECK: content
+          CCACHE_MAXSIZE: 500M
         with:
           esp_idf_version: v5.5
           target: esp32s3
