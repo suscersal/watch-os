@@ -20,3 +20,4 @@ android/local.properties
 *.patch
 *.log
 *.bin
+watch-os-full.bin
