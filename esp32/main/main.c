@@ -4,6 +4,7 @@
 #include "esp_err.h"          // должен идти до заголовков BSP: они используют esp_err_t, но сами его не подключают
 #include "esp_littlefs.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "nvs_flash.h"
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
@@ -93,12 +94,14 @@ void app_main(void)
     imu_esp_start();                    // подъём руки будит экран
 
     ESP_LOGW(TAG, "TRACE 6: imu ok");
+    ESP_LOGW(TAG, "heap internal: free %u, largest %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     if (!fs_ok) ESP_LOGW(TAG, "running without storage: no apps, PIN will not be saved");
 
     if (bsp_display_lock(0)) {
         ESP_LOGW(TAG, "TRACE 7: launcher create");
         watch_launcher_create();
         ESP_LOGW(TAG, "TRACE 8: launcher ok");
+        ESP_LOGW(TAG, "heap internal: free %u, largest %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
         clock_init();                                    // время из RTC PCF85063, пояс из настроек
         ESP_LOGW(TAG, "TRACE 9: watchface show");
         watchface_show(lv_screen_active());              // после включения - циферблат
