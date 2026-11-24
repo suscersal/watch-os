@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -102,7 +103,6 @@ static void on_scan_done(void)
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     (void)arg;
-    (void)data;
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         char ssid[33], pass[65];
         if (load_saved(ssid, sizeof ssid, pass, sizeof pass)) {
@@ -115,6 +115,10 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_SCAN_DONE) {
         on_scan_done();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t *d = data;
+        ESP_LOGW(TAG, "STA_DISCONNECTED reason=%d, internal free %u, largest %u",
+                 d ? (int)d->reason : -1, (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
         xEventGroupClearBits(s_ev, BIT_GOT_IP);
         if (s_user_req) {
             if (++s_user_fail >= USER_TRIES) {                      // скорее всего неверный пароль: возвращаемся к сохранённой сети
