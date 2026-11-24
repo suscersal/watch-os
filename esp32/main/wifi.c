@@ -165,6 +165,9 @@ bool wifi_start(void)
 
     wifi_init_config_t icfg = WIFI_INIT_CONFIG_DEFAULT();
     if (esp_wifi_init(&icfg) != ESP_OK) return false;
+    // Страна RU: каналы 1-13 активные. По умолчанию (мир "01") 12-13 только пассивные, и на роутере
+    // с каналом 13 аутентификация не проходит (STA_DISCONNECTED reason=2, AUTH_EXPIRE).
+    esp_wifi_set_country_code("RU", true);
     esp_wifi_set_storage(WIFI_STORAGE_RAM);            // не писать настройки Wi-Fi во флеш (сеть хранит settings.json)
 
     if (esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL) != ESP_OK) return false;
