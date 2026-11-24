@@ -74,7 +74,9 @@ void app_main(void)
     };
     cfg.lvgl_port_cfg.task_stack = CONFIG_WATCH_LVGL_STACK;
 
+    ESP_LOGW(TAG, "TRACE 1: display start");
     lv_display_t *disp = bsp_display_start_with_config(&cfg);
+    ESP_LOGW(TAG, "TRACE 2: display ok");
     if (!disp) {
         ESP_LOGE(TAG, "display init failed");
         return;
@@ -82,16 +84,23 @@ void app_main(void)
     if (bsp_display_lock(0)) { perf_esp_start(disp); bsp_display_unlock(); }   // замер отрисовки, если включено CONFIG_WATCH_PERF_LOG
     // После инициализации BSP яркость равна 0: без явной установки экран остаётся чёрным.
     // Яркостью дальше управляет watch/power (затемнение и выключение при бездействии, меню Display).
+    ESP_LOGW(TAG, "TRACE 3: perf ok");
     power_set_backend(set_brightness);
     if (audio_esp_init() != ESP_OK) ESP_LOGW(TAG, "audio disabled");   // динамик и микрофон; без них приложения работают вхолостую
+    ESP_LOGW(TAG, "TRACE 4: audio done");
     buttons_esp_start();                // BOOT = назад, PWR = экран вкл/выкл
+    ESP_LOGW(TAG, "TRACE 5: buttons ok");
     imu_esp_start();                    // подъём руки будит экран
 
+    ESP_LOGW(TAG, "TRACE 6: imu ok");
     if (!fs_ok) ESP_LOGW(TAG, "running without storage: no apps, PIN will not be saved");
 
     if (bsp_display_lock(0)) {
+        ESP_LOGW(TAG, "TRACE 7: launcher create");
         watch_launcher_create();
+        ESP_LOGW(TAG, "TRACE 8: launcher ok");
         clock_init();                                    // время из RTC PCF85063, пояс из настроек
+        ESP_LOGW(TAG, "TRACE 9: watchface show");
         watchface_show(lv_screen_active());              // после включения - циферблат
         bsp_display_unlock();
     }
