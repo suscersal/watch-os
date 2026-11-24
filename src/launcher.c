@@ -42,7 +42,7 @@
 #define FISH_STEP_SCALE 16   // ступень масштаба (256 = 100%)
 #define FISH_STEP_POS   4    // ступень сдвига, пикселей
 #define FISH_THROTTLE_MS 80  // на ESP32 при прокрутке пересчитываем не чаще, чем раз в столько мс
-// Чтобы полностью отключить эффект: добавьте определение WATCH_FISHEYE_OFF (например, -DWATCH_FISHEYE_OFF в CMake порта).
+// По умолчанию эффект ВЫКЛЮЧЕН (на часах он давал низкий FPS при прокрутке). Чтобы включить: -DWATCH_FISHEYE_ON (например, в CMake порта).
 
 static lv_obj_t *launcher;
 
@@ -84,7 +84,7 @@ __attribute__((unused)) static void fisheye_update(lv_obj_t *cont)
 
 static void scroll_cb(lv_event_t *e)
 {
-#ifndef WATCH_FISHEYE_OFF
+#ifdef WATCH_FISHEYE_ON
 #ifdef ESP_PLATFORM
     // На часах эффект тяжёлый: при прокрутке обновляем не каждый кадр, а по таймеру; в конце прокрутки - обязательно.
     static uint32_t last;
@@ -234,7 +234,7 @@ static void build_grid(void)
     }
 
     lv_obj_update_layout(cont);
-#ifndef WATCH_FISHEYE_OFF
+#ifdef WATCH_FISHEYE_ON
     fisheye_update(cont);
 #endif
 }
