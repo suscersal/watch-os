@@ -9,7 +9,7 @@
 #include <string.h>
 
 #define GRID_MAX   60      // миниатюр в сетке
-#define THUMB_CELL 120
+#define THUMB_CELL 118     // 3 в ряд: 3*118 + 2*8 = 370 = 410 - 2*20 (при 120 влезало только 2)
 
 // Объявлена в src/misc/cache/instance/lv_image_cache.h, которого нет в общем заголовке lvgl.h (путь к нему различается
 // у ПК и ESP-IDF), поэтому объявляем прототип здесь.
@@ -22,6 +22,9 @@ static lv_obj_t *view_scr, *view_img, *view_count, *view_date;
 static imgbuf_t *view_buf;
 static uint32_t  ids[PHOTOS_MAX], taken[PHOTOS_MAX];
 static int       n_ids, idx = -1;
+static lv_timer_t *thumb_timer, *full_timer;   // миниатюры подгружаются по две за тик; полный кадр декодируется после показа окна
+static int       thumb_next, thumb_total;
+static bool      grid_dirty;                   // список фото изменился (удаление): сетку надо перестроить
 
 static void build_grid(void);
 
@@ -62,6 +65,7 @@ static void viewer_show(int i);
 static void viewer_gone_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
+    if (full_timer) { lv_timer_delete(full_timer); full_timer = NULL; }
     imgbuf_free(view_buf);
     view_buf = NULL;
     view_scr = view_img = view_count = view_date = NULL;
@@ -71,7 +75,8 @@ static void viewer_gone_cb(lv_event_t *e)
 static void viewer_back_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
-    build_grid();
+    if (grid_dirty) { build_grid(); grid_dirty = false; }      // без удаления сетка уже готова: заново ничего не читаем с диска
+    else if (thumb_timer) lv_timer_resume(thumb_timer);
     lv_screen_load_anim(grid_scr, LV_SCREEN_LOAD_ANIM_MOVE_RIGHT, 200, 0, true);   // окно просмотра удаляется
 }
 
@@ -97,14 +102,30 @@ static void gesture_cb(lv_event_t *e)
     if (d == LV_DIR_RIGHT) gallery_viewer_step(-1);
 }
 
+// Полный кадр 410x502 декодируется программно и занимает заметное время. Поэтому окно появляется сразу с маленькой
+// миниатюрой, а полный кадр подгружается следом, отдельным тиком таймера.
+static void full_timer_cb(lv_timer_t *t)
+{
+    LV_UNUSED(t);
+    full_timer = NULL;                          // таймер с одним повтором LVGL удалит сам
+    if (!view_scr || idx < 0 || idx >= n_ids) return;
+    imgbuf_t *nb = imgbuf_load(ids[idx], false);
+    if (!nb) { sys_toast("Cannot open photo"); return; }       // остаётся миниатюра
+    lv_image_set_src(view_img, &nb->dsc);
+    imgbuf_free(view_buf);                      // старый буфер освобождаем после переключения виджета
+    view_buf = nb;
+}
+
 static void viewer_show(int i)
 {
     idx = i;
-    imgbuf_t *nb = imgbuf_load(ids[i], false);
-    if (nb) lv_image_set_src(view_img, &nb->dsc);
-    imgbuf_free(view_buf);      // старый буфер освобождаем после того, как виджет переключен на новый
-    view_buf = nb;
-    if (!nb) sys_toast("Cannot open photo");
+    if (full_timer) { lv_timer_delete(full_timer); full_timer = NULL; }
+    imgbuf_t *tb = imgbuf_load(ids[i], true);
+    lv_image_set_src(view_img, tb ? &tb->dsc : NULL);
+    imgbuf_free(view_buf);
+    view_buf = tb;
+    full_timer = lv_timer_create(full_timer_cb, 30, NULL);
+    lv_timer_set_repeat_count(full_timer, 1);
 
     char t[48];
     snprintf(t, sizeof t, "%d / %d", i + 1, n_ids);
@@ -120,6 +141,7 @@ static void delete_confirm_cb(bool ok, void *ud)
     uint32_t id = ids[idx];
     if (!photos_delete(id)) { sys_toast("Could not delete"); return; }
     sys_toast("Photo deleted");
+    grid_dirty = true;
     int keep = idx;
     n_ids = photos_list(ids, taken, PHOTOS_MAX);
     if (n_ids == 0) { viewer_back_cb(NULL); return; }
@@ -164,10 +186,10 @@ static void viewer_open(int start)
     view_img = lv_image_create(view_scr);
     lv_obj_center(view_img);
 
-    lv_obj_align(round_btn(view_scr, LV_SYMBOL_LEFT, WS_FILL, viewer_back_cb, NULL), LV_ALIGN_TOP_LEFT, 10, 10);
-    lv_obj_align(round_btn(view_scr, LV_SYMBOL_TRASH, 0xB91C1C, delete_cb, NULL), LV_ALIGN_TOP_RIGHT, -10, 10);
-    lv_obj_align(round_btn(view_scr, LV_SYMBOL_PREV, WS_FILL, step_cb, (void *)(intptr_t)-1), LV_ALIGN_BOTTOM_LEFT, 10, -10);
-    lv_obj_align(round_btn(view_scr, LV_SYMBOL_NEXT, WS_FILL, step_cb, (void *)(intptr_t)+1), LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+    lv_obj_align(round_btn(view_scr, LV_SYMBOL_LEFT, WS_FILL, viewer_back_cb, NULL), LV_ALIGN_TOP_LEFT, WS_CORNER_INSET(52), WS_CORNER_INSET(52));
+    lv_obj_align(round_btn(view_scr, LV_SYMBOL_TRASH, 0xB91C1C, delete_cb, NULL), LV_ALIGN_TOP_RIGHT, -WS_CORNER_INSET(52), WS_CORNER_INSET(52));
+    lv_obj_align(round_btn(view_scr, LV_SYMBOL_PREV, WS_FILL, step_cb, (void *)(intptr_t)-1), LV_ALIGN_BOTTOM_LEFT, WS_CORNER_INSET(52), -WS_CORNER_INSET(52));
+    lv_obj_align(round_btn(view_scr, LV_SYMBOL_NEXT, WS_FILL, step_cb, (void *)(intptr_t)+1), LV_ALIGN_BOTTOM_RIGHT, -WS_CORNER_INSET(52), -WS_CORNER_INSET(52));
 
     view_count = lv_label_create(view_scr);
     lv_obj_set_style_text_color(view_count, lv_color_white(), 0);
@@ -182,11 +204,38 @@ static void viewer_open(int start)
 }
 
 // ---------- сетка миниатюр ----------
-static void cell_cb(lv_event_t *e) { viewer_open((int)(intptr_t)lv_event_get_user_data(e)); }
+static void cell_cb(lv_event_t *e)
+{
+    if (thumb_timer) lv_timer_pause(thumb_timer);     // пока открыт просмотр, миниатюры не грузим
+    viewer_open((int)(intptr_t)lv_event_get_user_data(e));
+}
+
+static void thumbs_stop(void)
+{
+    if (thumb_timer) { lv_timer_delete(thumb_timer); thumb_timer = NULL; }
+}
+
+// Ячейки создаются сразу (дёшево), а JPEG миниатюр читаются с диска по две за тик: интерфейс не замирает на сотни миллисекунд.
+static void thumbs_tick_cb(lv_timer_t *t)
+{
+    if (!grid_body || grid_dirty) { thumb_timer = NULL; lv_timer_delete(t); return; }
+    for (int k = 0; k < 2 && thumb_next < thumb_total; k++, thumb_next++) {
+        lv_obj_t *cell = lv_obj_get_child(grid_body, thumb_next);
+        imgbuf_t *b = cell ? imgbuf_load(ids[thumb_next], true) : NULL;
+        if (!b) continue;
+        lv_obj_t *img = lv_image_create(cell);
+        lv_image_set_src(img, &b->dsc);
+        lv_obj_center(img);
+        lv_obj_remove_flag(img, LV_OBJ_FLAG_CLICKABLE);                               // касание достаётся ячейке
+        lv_obj_add_event_cb(img, thumb_deleted_cb, LV_EVENT_DELETE, b);
+    }
+    if (thumb_next >= thumb_total) { thumb_timer = NULL; lv_timer_delete(t); }
+}
 
 static void build_grid(void)
 {
     if (!grid_body) return;
+    thumbs_stop();
     lv_obj_clean(grid_body);
     n_ids = photos_list(ids, taken, PHOTOS_MAX);
 
@@ -209,14 +258,6 @@ static void build_grid(void)
         lv_obj_set_style_bg_color(cell, lv_color_hex(WS_CARD), 0);
         lv_obj_set_style_clip_corner(cell, true, 0);
         lv_obj_add_event_cb(cell, cell_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
-
-        imgbuf_t *b = imgbuf_load(ids[i], true);
-        if (!b) continue;
-        lv_obj_t *img = lv_image_create(cell);
-        lv_image_set_src(img, &b->dsc);
-        lv_obj_center(img);
-        lv_obj_remove_flag(img, LV_OBJ_FLAG_CLICKABLE);                               // касание достаётся ячейке
-        lv_obj_add_event_cb(img, thumb_deleted_cb, LV_EVENT_DELETE, b);
     }
     if (n_ids > shown) {
         lv_obj_t *l = lv_label_create(grid_body);
@@ -225,9 +266,12 @@ static void build_grid(void)
         lv_label_set_text(l, t);
         lv_obj_set_style_text_color(l, lv_color_hex(0x9CA3AF), 0);
     }
+    thumb_next = 0;
+    thumb_total = shown;
+    thumb_timer = lv_timer_create(thumbs_tick_cb, 5, NULL);
 }
 
-static void grid_gone_cb(lv_event_t *e) { LV_UNUSED(e); grid_scr = grid_body = NULL; }
+static void grid_gone_cb(lv_event_t *e) { LV_UNUSED(e); thumbs_stop(); grid_scr = grid_body = NULL; grid_dirty = false; }
 
 static void grid_back_cb(lv_event_t *e)
 {
@@ -243,6 +287,7 @@ void gallery_open(lv_obj_t *launcher)
     lv_obj_set_flex_flow(grid_body, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_row(grid_body, 8, 0);
     lv_obj_set_style_pad_column(grid_body, 8, 0);
+    grid_dirty = false;
     build_grid();
     lv_screen_load_anim(grid_scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);     // лаунчер не удаляем
 }
