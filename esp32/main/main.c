@@ -67,7 +67,7 @@ void app_main(void)
     bsp_display_cfg_t cfg = {
         .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
         .buffer_size = BSP_LCD_DRAW_BUFF_SIZE,
-        .double_buffer = BSP_LCD_DRAW_BUFF_DOUBLE,
+        .double_buffer = true,              // рисуем в один буфер, пока второй уходит на экран по DMA
         .flags = {
             .buff_dma = true,
             .buff_spiram = false,

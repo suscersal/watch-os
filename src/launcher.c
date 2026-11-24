@@ -39,12 +39,16 @@
 #define SCALE_MIN   140   // у краёв
 #define FISH_R      270   // на таком расстоянии от центра экрана достигается минимум
 #define PULL_PCT    30    // насколько сильно уменьшенные иконки подтягиваются к центру (%)
+#define FISH_STEP_SCALE 16   // ступень масштаба (256 = 100%)
+#define FISH_STEP_POS   4    // ступень сдвига, пикселей
+#define FISH_THROTTLE_MS 80  // на ESP32 при прокрутке пересчитываем не чаще, чем раз в столько мс
+// Чтобы полностью отключить эффект: добавьте определение WATCH_FISHEYE_OFF (например, -DWATCH_FISHEYE_OFF в CMake порта).
 
 static lv_obj_t *launcher;
 
 // Масштаб и сдвиг каждой иконки зависят от расстояния до центра экрана.
 // Стиль меняем только если значение реально изменилось, иначе каждый кадр прокрутки перерисовывал бы всё зря.
-static void fisheye_update(lv_obj_t *cont)
+__attribute__((unused)) static void fisheye_update(lv_obj_t *cont)
 {
     uint32_t n = lv_obj_get_child_count(cont);
     for (uint32_t k = 0; k < n; k++) {
@@ -61,6 +65,13 @@ static void fisheye_update(lv_obj_t *cont)
         int32_t tx = -dx * pull / 100;
         int32_t ty = -dy * pull / 100;
 
+        // Ступени вместо плавного значения: иначе масштаб меняется на каждый пиксель прокрутки,
+        // и LVGL заново рисует иконки через промежуточный слой. Со ступенями большинство кадров
+        // ничего не перерисовывает.
+        s  = (s  / FISH_STEP_SCALE) * FISH_STEP_SCALE;
+        tx = (tx / FISH_STEP_POS)   * FISH_STEP_POS;
+        ty = (ty / FISH_STEP_POS)   * FISH_STEP_POS;
+
         if (lv_obj_get_style_transform_scale_x(c, 0) != s) {
             lv_obj_set_style_transform_pivot_x(c, ICON / 2, 0);
             lv_obj_set_style_transform_pivot_y(c, ICON / 2, 0);
@@ -73,7 +84,19 @@ static void fisheye_update(lv_obj_t *cont)
 
 static void scroll_cb(lv_event_t *e)
 {
+#ifndef WATCH_FISHEYE_OFF
+#ifdef ESP_PLATFORM
+    // На часах эффект тяжёлый: при прокрутке обновляем не каждый кадр, а по таймеру; в конце прокрутки - обязательно.
+    static uint32_t last;
+    if (lv_event_get_code(e) == LV_EVENT_SCROLL) {
+        if (lv_tick_elaps(last) < FISH_THROTTLE_MS) return;
+        last = lv_tick_get();
+    }
+#endif
     fisheye_update(lv_event_get_target_obj(e));
+#else
+    (void)e;
+#endif
 }
 
 static void app_cb(lv_event_t *e)
@@ -153,6 +176,7 @@ static void build_grid(void)
     lv_obj_set_style_pad_bottom(cont, 160, 0);   // запас, чтобы нижние иконки доехали до центра
     lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(cont, scroll_cb, LV_EVENT_SCROLL, NULL);
+    lv_obj_add_event_cb(cont, scroll_cb, LV_EVENT_SCROLL_END, NULL);
 
     // Сколько рядов получится: 3 иконки, 4, 3, 4, ...
     int rows = 0;
@@ -210,5 +234,7 @@ static void build_grid(void)
     }
 
     lv_obj_update_layout(cont);
+#ifndef WATCH_FISHEYE_OFF
     fisheye_update(cont);
+#endif
 }
