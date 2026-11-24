@@ -200,7 +200,7 @@ static void viewer_open(int start)
     lv_obj_align(view_date, LV_ALIGN_BOTTOM_MID, 0, -12);
 
     viewer_show(start);
-    lv_screen_load_anim(view_scr, LV_SCREEN_LOAD_ANIM_FADE_IN, 150, 0, false);       // сетку не удаляем
+    lv_screen_load_anim(view_scr, LV_SCREEN_LOAD_ANIM_NONE, 0, 0, false);          // без анимации: fade перерисовывал бы фото на каждом кадре; сетку не удаляем
 }
 
 // ---------- сетка миниатюр ----------
