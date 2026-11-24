@@ -41,6 +41,15 @@ bool plat_rtc_read(int64_t *epoch_utc)
 
 void plat_rtc_write(int64_t epoch_utc) { (void)epoch_utc; }   // системное время на ПК не трогаем
 
+void plat_haptic(const uint16_t *pattern_ms, int n)
+{
+    if (!pattern_ms || n <= 0) return;
+    printf("[haptic]");
+    for (int i = 0; i < n && i < 16; i++) printf(" %s %ums", i % 2 == 0 ? "on" : "off", (unsigned)pattern_ms[i]);
+    printf("\n");
+    fflush(stdout);
+}
+
 bool plat_battery(int *pct, bool *charging)
 {
     const char *e = getenv("WATCH_BATTERY");

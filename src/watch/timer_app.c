@@ -2,6 +2,7 @@
 // прогресс - оранжевая линия по рамке экрана (по часовой стрелке от середины верха).
 #include "timer_app.h"
 #include "clock.h"
+#include "haptic.h"
 #include "messages.h"
 #include "sys_ui.h"
 #include "watch_fonts.h"
@@ -132,6 +133,7 @@ static void check_done(void)
     snprintf(txt, sizeof txt, "Прошло: %s", len);
     int64_t now;
     messages_add(MSG_ID_TIMER, clock_utc(&now) ? (uint32_t)now : 0, "Таймер", "Время вышло", txt);
+    haptic_timer_done();
     changed();
 }
 
@@ -191,6 +193,7 @@ static void start_from(uint32_t remain)
 static void main_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
+    haptic_tick();
     switch (T.st) {
     case T_IDLE:  start_from(total_ms()); break;
     case T_RUN:   T.remain_ms = remaining(); T.st = T_PAUSE; break;
@@ -204,6 +207,7 @@ static void main_cb(lv_event_t *e)
 static void reset_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
+    haptic_tick();
     T.st = T_IDLE;
     T.remain_ms = total_ms();
     refresh();

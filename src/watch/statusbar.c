@@ -1,5 +1,6 @@
 #include "statusbar.h"
 #include "clock.h"
+#include "haptic.h"
 #include "lock_screen.h"
 #include "plat.h"
 #include "power.h"
@@ -46,12 +47,14 @@ static void scrim_cb(lv_event_t *e)
 static void stop_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
+    haptic_tick();
     timer_stop();                 // меню закроется само: таймер больше не активен
 }
 
 static void main_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
+    haptic_tick();
     if (timer_state() == TIMER_RUNNING) timer_pause(); else timer_resume();   // пауза / продолжить / заново
 }
 
@@ -166,7 +169,12 @@ static void popup_update(void)
 }
 
 // ---------- сама строка ----------
-static void chip_cb(lv_event_t *e) { LV_UNUSED(e); if (B.scrim) statusbar_popup_close(); else popup_open(); }
+static void chip_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    haptic_tick();
+    if (B.scrim) statusbar_popup_close(); else popup_open();
+}
 
 static void refresh_bar(void)
 {
