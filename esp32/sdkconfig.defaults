@@ -34,6 +34,9 @@ CONFIG_ESP_WIFI_RX_BA_WIN=6
 CONFIG_BSP_LCD_RGB_BOUNCE_BUFFER_HEIGHT=20
 
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
+# Задача системных событий (sys_evt): по умолчанию стек 2304 Б, а в ней wifi.c при получении IP сохраняет сеть в settings.json
+# (запись файла на LittleFS) - стек переполнялся и плата перезагружалась до сохранения пароля.
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=6144
 CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 
 # HTTPS: набор корневых сертификатов (esp_crt_bundle)
