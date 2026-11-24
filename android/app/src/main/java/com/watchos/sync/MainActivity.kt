@@ -190,16 +190,20 @@ class MainActivity : Activity() {
 
         busy(true)
         worker.execute {
+            var step = "connect"                       // на каком шаге оборвалось: видно в тексте ошибки
             try {
                 WatchClient(host, port).use { w ->
                     say("Connecting to $host:$port ...")
                     w.connect()
+                    step = "hello"
                     val info = w.hello(code, android.os.Build.MODEL ?: "phone")
                     say("Paired. The watch has ${info.photoCount} of ${info.maxPhotos} photos.")
                     val now = System.currentTimeMillis()
+                    step = "time"
                     w.setTime(now / 1000, TimeZone.getDefault().getOffset(now) / 60000)
 
                     if (uris.isEmpty()) { say("Time synced."); return@use }
+                    step = "list"
                     val have = w.listPhotos()
                     var sent = 0
                     var skipped = 0
@@ -208,6 +212,7 @@ class MainActivity : Activity() {
                         val id = PhotoPrep.idOf(this, uri)
                         if (id in have) { skipped++; return@forEachIndexed }
                         val p = PhotoPrep.prepare(this, uri, id)
+                        step = "photo ${index + 1}"
                         w.sendPhoto(p.id, p.takenSeconds, p.thumb, p.full) { done, total ->
                             runOnUiThread { progress.progress = ((index + done.toFloat() / total) * 100 / uris.size).toInt() }
                         }
@@ -216,7 +221,9 @@ class MainActivity : Activity() {
                     say("Done: $sent sent, $skipped already on the watch.")
                 }
             } catch (e: Exception) {
-                say("Error: ${e.message ?: e.javaClass.simpleName}")
+                val what = e.message ?: e.javaClass.simpleName
+                val hint = if (e is java.io.EOFException) " (the watch closed the connection: reopen Sync on the watch and enter the new code)" else ""
+                say("Error at $step: $what$hint")
             } finally {
                 busy(false)
             }
