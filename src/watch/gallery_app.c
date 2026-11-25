@@ -1,6 +1,7 @@
 #include "gallery_app.h"
 #include "ws_style.h"
 #include "clock.h"
+#include "photo_ai.h"
 #include "photos.h"
 #include "sys_ui.h"
 #include "watch_fonts.h"
@@ -261,6 +262,12 @@ static void delete_cb(lv_event_t *e)
     sys_confirm("Delete photo?", "The photo will be removed from the watch.", delete_confirm_cb, NULL);
 }
 
+static void ai_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    if (view_scr && idx >= 0 && idx < n_ids) photo_ai_open(ids[idx]);
+}
+
 static lv_obj_t *round_btn(lv_obj_t *parent, const char *sym, uint32_t color, lv_event_cb_t cb, void *ud)
 {
     lv_obj_t *b = lv_button_create(parent);
@@ -297,6 +304,7 @@ static void viewer_open(int start)
 
     lv_obj_align(round_btn(view_scr, LV_SYMBOL_LEFT, WS_FILL, viewer_back_cb, NULL), LV_ALIGN_TOP_LEFT, WS_CORNER_INSET(52), WS_CORNER_INSET(52));
     lv_obj_align(round_btn(view_scr, LV_SYMBOL_TRASH, 0xB91C1C, delete_cb, NULL), LV_ALIGN_TOP_RIGHT, -WS_CORNER_INSET(52), WS_CORNER_INSET(52));
+    lv_obj_align(round_btn(view_scr, "AI", ws_accent(), ai_cb, NULL), LV_ALIGN_TOP_MID, 0, WS_CORNER_INSET(52) - 6);
     lv_obj_align(round_btn(view_scr, LV_SYMBOL_PREV, WS_FILL, step_cb, (void *)(intptr_t)-1), LV_ALIGN_BOTTOM_LEFT, WS_CORNER_INSET(52), -WS_CORNER_INSET(52));
     lv_obj_align(round_btn(view_scr, LV_SYMBOL_NEXT, WS_FILL, step_cb, (void *)(intptr_t)+1), LV_ALIGN_BOTTOM_RIGHT, -WS_CORNER_INSET(52), -WS_CORNER_INSET(52));
 

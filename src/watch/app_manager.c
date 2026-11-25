@@ -10,6 +10,7 @@
 #include "calc_app.h"
 #include "security_app.h"
 #include "gallery_app.h"
+#include "files_app.h"
 #include "messages_app.h"
 #include "settings_app.h"
 #include "sync_app.h"
@@ -186,6 +187,15 @@ size_t app_manager_scan(const char *root)
         snprintf(a->icon, sizeof a->icon, "image");
         a->color = 0xF97316;
         a->builtin = gallery_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_files");
+        snprintf(a->name, sizeof a->name, "Files");
+        snprintf(a->icon, sizeof a->icon, "folder");
+        a->color = 0xFACC15;
+        a->builtin = files_open;
     }
     if (napps < APPS_MAX) {
         app_info_t *a = &apps[napps++];

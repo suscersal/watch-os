@@ -17,7 +17,7 @@
       "title": "Chosen",
       "ui": [
         { "type": "label", "text": "You tapped: @item" },
-        { "type": "button", "text": "Ask AI table (stub)",
+        { "type": "button", "text": "Ask AI table",
           "on_click": [
             { "do": "ai.ask_table", "q": "Planets", "out": "result" },
             { "do": "goto", "screen": "table" } ] },

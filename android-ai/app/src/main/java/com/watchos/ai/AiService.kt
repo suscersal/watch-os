@@ -47,6 +47,13 @@ class AiService : Service() {
             "In PLOT lines xmin and xmax must be plain decimal numbers like -6.28; 6.28, never pi or expressions. " +
             "For other charts or tables give the data as up to 8 lines 'label: value' " +
             "(numbers only after the colon) and then one short sentence."
+        const val IMAGE_SYSTEM = "You see a photo on a tiny smartwatch screen. Answer the user's question about it " +
+            "in the language of the question. Be brief: at most 400 characters, plain text, no markdown."
+        const val TABLE_SYSTEM = "You fill a table for a smartwatch screen. Reply with ONLY JSON, no markdown, no code fences: " +
+            "{\"rows\": [[\"Header 1\", \"Header 2\"], [\"a\", \"b\"]]}. The first row is the header. At most 4 columns and 12 rows " +
+            "including the header; every cell is plain text of at most 20 characters (no LaTeX). Use the language of the question."
+        private const val MAX_IMAGE_ANSWER_BYTES = 900
+        private const val MAX_BODY_BYTES = 1_500_000   // фото в base64 до ~350 КБ
         private const val MAX_ANSWER_BYTES = 480   // часы хранят ответ в 512 байтах (VAR_VAL)
         @Volatile var running = false
         @Volatile var info = ""
@@ -109,7 +116,7 @@ class AiService : Service() {
     private fun handle(s: Socket) {
         s.use {
             try {
-                s.soTimeout = 10000
+                s.soTimeout = 20000
                 val req = readRequest(s.getInputStream())
                 val out = s.getOutputStream()
                 when {
@@ -117,10 +124,18 @@ class AiService : Service() {
                     req.first.startsWith("GET /ping") -> reply(out, 200, "ok")
                     !req.first.startsWith("POST /ask") -> reply(out, 404, "Not found")
                     else -> {
-                        val q = try { JSONObject(String(req.second, Charsets.UTF_8)).getString("q") } catch (_: Exception) { "" }
+                        val j = try { JSONObject(String(req.second, Charsets.UTF_8)) } catch (_: Exception) { null }
+                        val img = j?.optString("img").orEmpty().ifEmpty { null }
+                        val table = j?.optBoolean("table", false) == true
+                        val q = j?.optString("q").orEmpty().ifBlank { if (img != null) "What is in this photo?" else "" }
                         if (q.isBlank()) { reply(out, 400, "Empty question"); return }
                         info = "${now()} asking: ${q.take(40)}"
-                        val answer = MathFormat.limitBytes(MathFormat.format(Plot.process(ask(q.trim()))), MAX_ANSWER_BYTES)
+                        val raw = ask(q.trim(), img, table)
+                        val answer = when {
+                            img != null -> MathFormat.limitBytes(raw.trim(), MAX_IMAGE_ANSWER_BYTES)
+                            table -> WatchTable.normalize(raw) ?: throw ApiError(502, "AI did not return a table")
+                            else -> MathFormat.limitBytes(MathFormat.format(Plot.process(raw)), MAX_ANSWER_BYTES)
+                        }
                         info = "${now()} OK: ${q.take(40)}"
                         reply(out, 200, answer)
                     }
@@ -152,7 +167,7 @@ class AiService : Service() {
         val lines = head.toString("ISO-8859-1").split("\r\n")
         var len = 0
         for (l in lines.drop(1)) if (l.startsWith("Content-Length:", ignoreCase = true)) len = l.substringAfter(':').trim().toIntOrNull() ?: -1
-        if (len < 0 || len > 4000) return null
+        if (len < 0 || len > MAX_BODY_BYTES) return null
         val body = ByteArray(len)
         var off = 0
         while (off < len) {
@@ -177,12 +192,12 @@ class AiService : Service() {
     private class ApiError(val code: Int, msg: String, val retry: Boolean = false) : Exception(msg)
 
     /** Бесплатные модели иногда отвечают пустотой или падают на стороне провайдера: пробуем ещё раз (до 3 попыток, ~35 с). */
-    private fun ask(q: String): String {
+    private fun ask(q: String, img: String? = null, table: Boolean = false): String {
         val t0 = System.currentTimeMillis()
         var attempt = 1
         while (true) {
             try {
-                return askOnce(q)
+                return askOnce(q, img, table)
             } catch (e: ApiError) {
                 if (!e.retry || attempt >= 3 || System.currentTimeMillis() - t0 > 35000) throw e
                 attempt++
@@ -191,11 +206,18 @@ class AiService : Service() {
         }
     }
 
-    private fun askOnce(q: String): String {
+    private fun askOnce(q: String, img: String?, table: Boolean): String {
         val prefs = getSharedPreferences("ai", MODE_PRIVATE)
         val key = prefs.getString("key", "")?.trim().orEmpty()
         val model = prefs.getString("model", DEFAULT_MODEL)?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_MODEL
-        val system = prefs.getString("system", "")?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_SYSTEM
+        val system = when {
+            img != null -> IMAGE_SYSTEM
+            table -> TABLE_SYSTEM
+            else -> prefs.getString("system", "")?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_SYSTEM
+        }
+        val userContent: Any = if (img == null) q else JSONArray()
+            .put(JSONObject().put("type", "text").put("text", q))
+            .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:image/jpeg;base64,$img")))
         if (key.isEmpty()) throw ApiError(503, "No API key in Watch AI app")
 
         val body = JSONObject()
@@ -203,7 +225,7 @@ class AiService : Service() {
             .put("max_tokens", 800)   // запас: «думающие» модели тратят часть токенов на рассуждение
             .put("messages", JSONArray()
                 .put(JSONObject().put("role", "system").put("content", system))
-                .put(JSONObject().put("role", "user").put("content", q)))
+                .put(JSONObject().put("role", "user").put("content", userContent)))
             .toString()
 
         synchronized(apiLock) {

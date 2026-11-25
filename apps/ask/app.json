@@ -4,9 +4,51 @@
     "main": {
       "title": "Ask",
       "ui": [
-        { "type": "input", "var": "q", "placeholder": "Question" },
-        { "type": "button", "text": "Ask", "on_click": [ { "do": "ai.ask", "q": "@q", "out": "answer" } ] },
-        { "type": "math", "text": "@answer" }
+        {
+          "type": "input",
+          "var": "q",
+          "placeholder": "Question"
+        },
+        {
+          "type": "button",
+          "text": "Ask",
+          "on_click": [
+            {
+              "do": "ai.ask",
+              "q": "@q",
+              "out": "answer"
+            }
+          ]
+        },
+        {
+          "type": "button",
+          "text": "Table",
+          "on_click": [
+            {
+              "do": "ai.ask_table",
+              "q": "@q",
+              "out": "result"
+            },
+            {
+              "do": "goto",
+              "screen": "table"
+            }
+          ]
+        },
+        {
+          "type": "math",
+          "text": "@answer"
+        }
+      ]
+    },
+    "table": {
+      "title": "Table",
+      "ui": [
+        {
+          "type": "table",
+          "src": "result",
+          "header": true
+        }
       ]
     }
   }

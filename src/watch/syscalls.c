@@ -82,15 +82,22 @@ static void sc_ai_ask(app_run_t *r, const cJSON *a)
     vars_set(vars_valid_name(out) ? out : "result", res);
 }
 
-// Заглушка таблицы ИИ: настоящий запрос появится вместе с настройками и ключом API.
+// Таблица от ИИ (phone: режим "table", docs/ai-bridge.md). Вызов блокирующий. Таблица кладётся под именем out;
+// при ошибке в ней одна строка с текстом ошибки, чтобы экран с виджетом table не был пустым.
 static void sc_ai_ask_table(app_run_t *r, const cJSON *a)
 {
     LV_UNUSED(r);
-    char q[VAR_VAL];
+    char q[VAR_VAL - 16], err[96];
     arg_text(a, "q", q, sizeof q);
     const char *out = jstr(a, "out");
-    const char *cells[] = { "Query", "Answer", q, "(stub)", "Rows", "3" };
-    tables_set_cells(vars_valid_name(out) ? out : "result", 3, 2, cells);
+    const char *name = vars_valid_name(out) ? out : "result";
+    sys_toast("Asking AI...");
+    lv_refr_now(NULL);
+    if (!ai_ask_table(q, name, err, sizeof err)) {
+        const char *cells[] = { "Error", err };
+        tables_set_cells(name, 1, 2, cells);
+        sys_toast(err);
+    }
 }
 
 // Постоянное хранилище приложения. Ключи и значения - текст; доступ только к своим данным.

@@ -155,7 +155,7 @@ static void tools_flow(lv_obj_t *launcher)
     run_json("[{\"do\":\"ai.ask_table\",\"q\":\"Planets\",\"out\":\"result\"},{\"do\":\"goto\",\"screen\":\"table\"}]");
     nfound = 0; collect(lv_screen_active(), &lv_table_class);
     CHECK(nfound == 1, "table from ai.ask_table built");
-    if (nfound) CHECK(strcmp(lv_table_get_cell_value(found[0], 1, 1), "(stub)") == 0, "table cell value");
+    if (nfound) CHECK(strcmp(lv_table_get_cell_value(found[0], 0, 0), "Error") == 0, "no phone: table shows an error row");
 
     run_json("[{\"do\":\"goto\",\"screen\":\"static\"}]");
     nfound = 0; collect(lv_screen_active(), &lv_table_class);

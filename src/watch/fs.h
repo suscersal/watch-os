@@ -24,3 +24,5 @@ bool fs_append_file(const char *path, const void *data, size_t n);              
 bool fs_write_at(const char *path, size_t offset, const void *data, size_t n);     // перезаписать кусок существующего файла
 long fs_file_size(const char *path);                                               // -1, если файла нет
 long fs_read_range(const char *path, size_t offset, void *buf, size_t n);          // прочитано байт, -1 при ошибке
+
+bool fs_is_dir(const char *path);   // true, если path - каталог (для файлового менеджера)

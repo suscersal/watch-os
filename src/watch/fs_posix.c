@@ -95,3 +95,9 @@ long fs_read_range(const char *path, size_t offset, void *buf, size_t n)
     fclose(f);
     return (long)rd;
 }
+
+bool fs_is_dir(const char *path)
+{
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
