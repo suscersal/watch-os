@@ -18,6 +18,11 @@
 #define SYNC_T_PHOTO_END     0x12
 #define SYNC_T_PHOTO_LIST    0x13
 #define SYNC_T_PHOTO_DELETE  0x14     // id u32
+#define SYNC_T_AUDIO_BEGIN   0x30     // id u32, size u32, crc32 u32 (от всего файла), name_len u8, имя (utf8, .wav)
+#define SYNC_T_AUDIO_DATA    0x31     // сырые байты WAV, куски до 16384 байт
+#define SYNC_T_AUDIO_END     0x32
+#define SYNC_T_AUDIO_COVER   0x33     // после AUDIO_BEGIN (ответ READY), до DATA: обложка, baseline JFIF JPEG до 160x160, не больше 20000 байт
+#define SYNC_AUDIO_MAX_BYTES (24u * 1024 * 1024)
 #define SYNC_T_MESSAGE       0x20     // уведомление: id u32, ts u32, app_len u8, title_len u8, text_len u16, затем app, title, text (utf8)
 #define SYNC_T_BYE           0x7F
 

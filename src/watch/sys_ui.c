@@ -494,7 +494,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
         lv_label_set_text(t, title);
         lv_obj_set_style_text_font(t, WATCH_FONT_BOLD_S, 0);
         lv_obj_set_style_text_color(t, lv_color_hex(ws_accent()), 0);
-        lv_obj_align(t, LV_ALIGN_TOP_LEFT, 35, 29);
+        lv_obj_align(t, LV_ALIGN_TOP_LEFT, 42, 29);
         lv_obj_t *tm = NULL;
         if (right_text) {                                   // вместо времени свой текст (например, длительность таймера)
             tm = lv_label_create(bar);
@@ -503,7 +503,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
             lv_obj_set_style_text_font(tm, WATCH_FONT_BODY, 0);
             lv_obj_set_style_text_align(tm, LV_TEXT_ALIGN_RIGHT, 0);
             lv_obj_set_width(tm, 130);
-            lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -33, 28);
+            lv_obj_align(tm, LV_ALIGN_TOP_RIGHT, -42, 28);
         } else {
             tm = NULL;                                      // время показывает общая строка состояния
         }

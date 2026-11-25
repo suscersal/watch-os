@@ -3,11 +3,15 @@
 #include "crc32.h"
 #include "lock_screen.h"
 #include "messages.h"
+#include "audio.h"
+#include "fs.h"
+#include "music_app.h"
 #include "photos.h"
 #include "sync_proto.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #define MAX_AUTH_FAILS 3
 
@@ -31,6 +35,11 @@ typedef struct {
     bool     photo_active;
     uint32_t id, taken, thumb_n, full_n, crc, recv;
     uint8_t *buf;                // миниатюра + полный кадр подряд
+
+    // текущий аудиофайл (пишется на диск по частям)
+    bool     audio_active;
+    uint32_t a_size, a_crc, a_recv, a_run;
+    char     a_path[160], a_cover[164];
 } sess_t;
 
 static sess_t        S;
@@ -73,6 +82,13 @@ static void photo_reset(void)
     S.recv = 0;
 }
 
+static void audio_reset(bool remove_file)
+{
+    if (S.audio_active && remove_file && S.a_path[0]) { fs_remove(S.a_path); fs_remove(S.a_cover); }
+    S.audio_active = false;
+    S.a_recv = 0;
+}
+
 void sync_rx_open(const char *code, const sync_io_t *io)
 {
     sync_rx_close();
@@ -88,6 +104,7 @@ void sync_rx_close(void)
 {
     if (!S.open) return;
     photo_reset();
+    audio_reset(true);
     free(S.payload);
     S.payload = NULL;
     S.open = false;
@@ -175,6 +192,55 @@ static void on_photo_end(void)
     emit(SYNC_EV_PHOTO);
 }
 
+// AUDIO_BEGIN: id u32, size u32, crc u32, name_len u8, name. Имя очищается от путей и получает суффикс .wav.
+static void on_audio_begin(void)
+{
+    if (S.len < 13) { send_err(SYNC_T_AUDIO_BEGIN, SYNC_E_BAD_FRAME); return; }
+    audio_reset(true);
+    uint32_t size = rd32(S.payload + 4), crc = rd32(S.payload + 8);
+    size_t nl = S.payload[12];
+    if (nl == 0 || nl > 80 || 13 + nl != S.len) { send_err(SYNC_T_AUDIO_BEGIN, SYNC_E_BAD_FRAME); return; }
+    if (size < 44 || size > SYNC_AUDIO_MAX_BYTES) { send_err(SYNC_T_AUDIO_BEGIN, SYNC_E_TOO_BIG); return; }
+    char name[96];
+    size_t k = 0;
+    for (size_t i = 0; i < nl && k < 80; i++) {
+        uint8_t c = S.payload[13 + i];
+        if (c < 0x20 || c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') c = '_';
+        name[k++] = (char)c;
+    }
+    name[k] = '\0';
+    if (name[0] == '.') name[0] = '_';
+    if (k < 4 || strcasecmp(name + k - 4, ".wav") != 0) snprintf(name + k, sizeof name - k, ".wav");
+    snprintf(S.a_path, sizeof S.a_path, "%s/%s", music_dir(), name);
+    if (fs_file_size(S.a_path) >= 0) { send_ok(SYNC_T_AUDIO_BEGIN, SYNC_S_HAVE); return; }   // уже есть
+    fs_mkdir(music_dir());
+    snprintf(S.a_cover, sizeof S.a_cover, "%.*s.jpg", (int)(strlen(S.a_path) - 4), S.a_path);
+    fs_remove(S.a_cover);                                   // обложка от прежнего файла с таким именем
+    S.audio_active = true;
+    S.a_size = size; S.a_crc = crc; S.a_recv = 0; S.a_run = 0;
+    send_ok(SYNC_T_AUDIO_BEGIN, SYNC_S_READY);
+}
+
+static void on_audio_cover(void)
+{
+    if (!S.audio_active || S.a_recv != 0) { send_err(SYNC_T_AUDIO_COVER, SYNC_E_STATE); return; }
+    if (S.len == 0 || S.len > 20000) { send_err(SYNC_T_AUDIO_COVER, SYNC_E_TOO_BIG); return; }
+    if (!photos_check_jpeg(S.payload, S.len, 160, 160, NULL, NULL)) { send_err(SYNC_T_AUDIO_COVER, SYNC_E_FORMAT); return; }
+    if (!fs_write_file(S.a_cover, (const char *)S.payload, S.len)) { send_err(SYNC_T_AUDIO_COVER, SYNC_E_STORAGE); return; }
+    send_ok(SYNC_T_AUDIO_COVER, 0);
+}
+
+static void on_audio_end(void)
+{
+    if (!S.audio_active || S.a_recv != S.a_size) { audio_reset(true); send_err(SYNC_T_AUDIO_END, SYNC_E_STATE); return; }
+    wav_info_t w;
+    if (S.a_run != S.a_crc) { audio_reset(true); send_err(SYNC_T_AUDIO_END, SYNC_E_CRC); return; }
+    if (!audio_wav_info(S.a_path, &w)) { audio_reset(true); send_err(SYNC_T_AUDIO_END, SYNC_E_FORMAT); return; }
+    audio_reset(false);
+    send_ok(SYNC_T_AUDIO_END, 0);
+    emit(SYNC_EV_AUDIO);
+}
+
 static void on_list(void)
 {
     uint32_t ids[200];
@@ -230,6 +296,9 @@ static bool on_frame(void)
     switch (S.type) {
     case SYNC_T_TIME:         on_time(); break;
     case SYNC_T_MESSAGE:      on_message(); break;
+    case SYNC_T_AUDIO_BEGIN:  on_audio_begin(); break;
+    case SYNC_T_AUDIO_COVER:  on_audio_cover(); break;
+    case SYNC_T_AUDIO_END:    on_audio_end(); break;
     case SYNC_T_PHOTO_BEGIN:  on_photo_begin(); break;
     case SYNC_T_PHOTO_END:    on_photo_end(); break;
     case SYNC_T_PHOTO_LIST:   on_list(); break;
@@ -250,10 +319,12 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
             S.len = rd32(S.hdr + 1);
             S.got = 0;
             if (S.len > SYNC_MAX_FRAME) { send_err(S.type, SYNC_E_TOO_BIG); g_why = "frame too big"; return false; }
-            if (S.type != SYNC_T_PHOTO_DATA) {
+            if (S.type != SYNC_T_PHOTO_DATA && S.type != SYNC_T_AUDIO_DATA) {
                 free(S.payload);
                 S.payload = malloc(S.len ? S.len : 1);
                 if (!S.payload) { g_why = "out of memory"; return false; }
+            } else if (S.type == SYNC_T_AUDIO_DATA) {
+                if (!S.authed || S.scope != SCOPE_FULL || !S.audio_active) { send_err(S.type, SYNC_E_STATE); g_why = "audio data without BEGIN"; return false; }
             } else if (!S.authed || !S.photo_active) {
                 send_err(S.type, SYNC_E_STATE);
                 g_why = "photo data without BEGIN";
@@ -261,14 +332,19 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
             }
             if (S.len == 0) {                       // пустой кадр: сразу обработать
                 S.hdr_n = 0;
-                if (S.type == SYNC_T_PHOTO_DATA) continue;
+                if (S.type == SYNC_T_PHOTO_DATA || S.type == SYNC_T_AUDIO_DATA) continue;
                 if (!on_frame()) return false;
             }
             continue;
         }
         size_t take = S.len - S.got;                // читаем данные кадра
         if (take > n) take = n;
-        if (S.type == SYNC_T_PHOTO_DATA) {
+        if (S.type == SYNC_T_AUDIO_DATA) {
+            if (S.a_recv + take > S.a_size) { send_err(S.type, SYNC_E_TOO_BIG); audio_reset(true); g_why = "audio data overflow"; return false; }
+            if (!fs_append_file(S.a_path, d, take)) { send_err(S.type, SYNC_E_STORAGE); audio_reset(true); g_why = "storage write failed"; return false; }
+            S.a_run = crc32_update(S.a_run, d, take);
+            S.a_recv += (uint32_t)take;
+        } else if (S.type == SYNC_T_PHOTO_DATA) {
             if (S.recv + take > S.thumb_n + S.full_n) { send_err(S.type, SYNC_E_TOO_BIG); photo_reset(); g_why = "photo data overflow"; return false; }
             memcpy(S.buf + S.recv, d, take);
             S.recv += (uint32_t)take;
@@ -278,7 +354,7 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
         S.got += (uint32_t)take; d += take; n -= take;
         if (S.got == S.len) {
             S.hdr_n = 0;
-            if (S.type != SYNC_T_PHOTO_DATA && !on_frame()) return false;
+            if (S.type != SYNC_T_PHOTO_DATA && S.type != SYNC_T_AUDIO_DATA && !on_frame()) return false;
         }
     }
     return true;

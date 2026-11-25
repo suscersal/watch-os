@@ -11,7 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define SIDE       34                     // отступ от краёв: углы экрана скруглены
+#define SIDE       (WS_CORNER_R * 58 / 100)   // отступ от боковых краёв: на высоте текста дуга угла (радиус WS_CORNER_R) уходит внутрь экрана на ~50 px
+#define BAR_Y      10                         // верх текста; при 4-6 px время и значки упирались в скругление
 #define STOPWATCH  "\xEF\x8B\xB2"         // FontAwesome f2f2, есть в шрифтах проекта
 #define ORANGE     0xFF8800
 
@@ -237,7 +238,7 @@ void statusbar_init(void)
     lv_obj_set_size(bar, lv_pct(100), STATUSBAR_H);
     lv_obj_set_pos(bar, 0, 0);
 
-    B.time = label_at(bar, "--:--", WATCH_FONT_SMALL, 0xFFFFFF, LV_ALIGN_TOP_LEFT, SIDE, 6);
+    B.time = label_at(bar, "--:--", WATCH_FONT_SMALL, 0xFFFFFF, LV_ALIGN_TOP_LEFT, SIDE, BAR_Y);
 
     lv_obj_t *right = lv_obj_create(bar);                    // Wi-Fi и батарея у правого края
     lv_obj_remove_style_all(right);
@@ -246,7 +247,7 @@ void statusbar_init(void)
     lv_obj_set_flex_flow(right, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(right, 10, 0);
-    lv_obj_align(right, LV_ALIGN_TOP_RIGHT, -SIDE, 4);
+    lv_obj_align(right, LV_ALIGN_TOP_RIGHT, -SIDE, BAR_Y - 2);
     B.wifi = label_at(right, LV_SYMBOL_WIFI, WATCH_FONT_SMALL, 0xFFFFFF, LV_ALIGN_DEFAULT, 0, 0);
     B.batt = label_at(right, "", WATCH_FONT_SMALL, 0xFFFFFF, LV_ALIGN_DEFAULT, 0, 0);
 

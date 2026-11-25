@@ -33,6 +33,7 @@ static void on_event(sync_event_t ev, void *ud)
         snprintf(t, sizeof t, "Photos received: %d", got_photos);
         set_status(t, 0x22C55E);
         break;
+    case SYNC_EV_AUDIO:         sys_toast("Audio received"); break;
     case SYNC_EV_PHOTO_DELETED: sys_toast("Photo removed by phone"); break;
     case SYNC_EV_MESSAGE:       break;     // уведомление уже лежит в messages; на экране синхронизации ничего не меняем
     case SYNC_EV_DISCONNECTED:

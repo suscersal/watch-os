@@ -24,6 +24,10 @@
 | 0x12 | PHOTO_END | пусто |
 | 0x13 | PHOTO_LIST | пусто |
 | 0x14 | PHOTO_DELETE | id u32 |
+| 0x30 | AUDIO_BEGIN | id u32, размер u32, crc32 u32 (всего файла), name_len u8, имя (utf-8, `.wav`). Ответ OK: 0 - слать, 1 - такой файл уже есть |
+| 0x33 | AUDIO_COVER | необязательно, сразу после AUDIO_BEGIN: обложка, baseline JFIF JPEG до 160x160, не больше 20000 байт. Хранится как `<имя>.jpg` рядом с треком |
+| 0x31 | AUDIO_DATA | сырые байты WAV (PCM), куски до 16384 байт; пишутся на диск по мере прихода |
+| 0x32 | AUDIO_END | пусто; проверяются размер, crc32 и заголовок WAV |
 | 0x20 | MESSAGE | уведомление: `id u32, ts u32, app_len u8, title_len u8, text_len u16`, затем `app, title, text` (utf-8; не больше 32 / 64 / 256 байт). Тот же `id` заменяет прежнее уведомление. Ответ OK |
 | 0x7F | BYE | пусто |
 

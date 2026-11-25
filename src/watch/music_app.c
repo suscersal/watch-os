@@ -3,6 +3,7 @@
 #include "art.h"
 #include "audio.h"
 #include "fs.h"
+#include "photos.h"
 #include "sys_ui.h"
 #include "watch_fonts.h"
 #include "ws_style.h"
@@ -11,9 +12,21 @@
 #include <string.h>
 #include <strings.h>
 
+
+// Декодер изображений LVGL: структуры лежат в приватном заголовке, в lvgl.h их нет, а путь к ним различается у ПК и ESP-IDF.
+#if __has_include("src/draw/lv_image_decoder_private.h")
+#include "src/draw/lv_image_decoder_private.h"
+#elif __has_include("draw/lv_image_decoder_private.h")
+#include "draw/lv_image_decoder_private.h"
+#else
+#include "lvgl/src/draw/lv_image_decoder_private.h"
+#endif
+
+
 #define MAX_TRACKS 24
 typedef struct {
     char title[48], artist[40], album[40], path[112];
+    char cover[112];      // <имя>.jpg рядом с треком, пусто - обложки нет
     uint32_t dur_ms;
 } track_t;
 
@@ -37,6 +50,8 @@ static void add_cb(const char *name, void *ud)
     wav_info_t w;
     if (!audio_wav_info(t->path, &w)) return;
     t->dur_ms = w.duration_ms;
+    snprintf(t->cover, sizeof t->cover, "%.*s.jpg", (int)(strlen(t->path) - 4), t->path);
+    if (fs_file_size(t->cover) <= 0) t->cover[0] = '\0';
     char base[96];
     snprintf(base, sizeof base, "%.*s", (int)(n - 4), name);
     char *sep = strstr(base, " - ");       // "Исполнитель - Название.wav"
@@ -75,6 +90,8 @@ void music_init(const char *root)
     fs_mkdir(root);
     fs_mkdir(g_dir);
 }
+
+const char *music_dir(void) { return g_dir; }
 
 static void fmt_time(char *b, size_t n, uint32_t ms, bool neg)
 {
@@ -159,6 +176,88 @@ static lv_obj_t *art_view(lv_obj_t *parent, int size, int radius, int x, int y)
     lv_image_set_scale(img, (uint32_t)(256 * size / 144));
     lv_obj_set_pos(img, 0, 0);
     return box;
+}
+
+// ---------- обложка текущего трека ----------
+// JPEG раскодируем один раз в RGB565 (так же, как в галерее): TJpgDec при каждой перерисовке читал бы файл заново.
+void lv_image_cache_drop(const void *src);
+static lv_image_dsc_t cover_dsc;
+static uint8_t       *cover_pix;
+static lv_obj_t      *p_art_img;
+static int            cover_for = -2;      // для какого трека показана обложка (-1 - заглушка)
+
+static void cover_free(void)
+{
+    lv_image_cache_drop(&cover_dsc);
+    free(cover_pix);
+    cover_pix = NULL;
+    memset(&cover_dsc, 0, sizeof cover_dsc);
+}
+
+static bool cover_decode(const char *path)
+{
+    size_t len = 0;
+    uint8_t *d = (uint8_t *)fs_read_file_n(path, 64 * 1024, &len);
+    if (!d) return false;
+    int w = 0, h = 0;
+    if (!photos_check_jpeg(d, len, 160, 160, &w, &h)) { free(d); return false; }
+    lv_image_dsc_t jpg;
+    memset(&jpg, 0, sizeof jpg);
+    jpg.header.magic = LV_IMAGE_HEADER_MAGIC;
+    jpg.header.cf = LV_COLOR_FORMAT_RAW;
+    jpg.header.w = (uint32_t)w;
+    jpg.header.h = (uint32_t)h;
+    jpg.data = d;
+    jpg.data_size = (uint32_t)len;
+    uint16_t *pix = malloc((size_t)w * h * 2);
+    bool ok = false;
+    lv_image_decoder_dsc_t dd;
+    memset(&dd, 0, sizeof dd);
+    lv_image_decoder_args_t args;
+    memset(&args, 0, sizeof args);
+    args.no_cache = true;
+    if (pix && lv_image_decoder_open(&dd, &jpg, &args) == LV_RESULT_OK) {
+        lv_area_t full = { 0, 0, w - 1, h - 1 };
+        lv_area_t a = { LV_COORD_MIN, LV_COORD_MIN, LV_COORD_MIN, LV_COORD_MIN };
+        while (lv_image_decoder_get_area(&dd, &full, &a) == LV_RESULT_OK) {
+            const uint8_t *src = dd.decoded ? dd.decoded->data : NULL;
+            if (!src || a.x1 < 0 || a.y1 < 0 || a.x1 >= w || a.y1 >= h) break;
+            int aw = a.x2 - a.x1 + 1, ah = a.y2 - a.y1 + 1;
+            for (int y = 0; y < ah; y++) {
+                uint16_t *row = pix + (size_t)(a.y1 + y) * w + a.x1;
+                for (int x = 0; x < aw; x++, src += 3)
+                    row[x] = (uint16_t)(((src[2] & 0xF8) << 8) | ((src[1] & 0xFC) << 3) | (src[0] >> 3));
+            }
+            if (a.x2 >= w - 1 && a.y2 >= h - 1) { ok = true; break; }
+        }
+        lv_image_decoder_close(&dd);
+    }
+    lv_image_cache_drop(&jpg);
+    free(d);
+    if (!ok) { free(pix); return false; }
+    cover_pix = (uint8_t *)pix;
+    cover_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    cover_dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    cover_dsc.header.w = (uint32_t)w;
+    cover_dsc.header.h = (uint32_t)h;
+    cover_dsc.header.stride = (uint32_t)w * 2;
+    cover_dsc.data = cover_pix;
+    cover_dsc.data_size = (uint32_t)((size_t)w * h * 2);
+    return true;
+}
+
+static void cover_show(int i)
+{
+    if (!p_art_img || i == cover_for) return;
+    cover_for = i;
+    lv_image_set_src(p_art_img, &art_demo);          // пока кэш держит старый dsc, его нельзя освобождать
+    cover_free();
+    if (i >= 0 && i < ntr && tr[i].cover[0] && cover_decode(tr[i].cover)) {
+        lv_image_set_src(p_art_img, &cover_dsc);
+        lv_image_set_scale(p_art_img, (uint32_t)(256 * 144 / cover_dsc.header.w));
+    } else {
+        lv_image_set_scale(p_art_img, 256);
+    }
 }
 
 static void load_to(lv_obj_t *scr, lv_screen_load_anim_t anim, bool del_old)
@@ -272,6 +371,7 @@ static void player_refresh(void)
     if (!scr_player) return;
     if (audio_finished()) next_track();
     const track_t *t = cur >= 0 ? &tr[cur] : NULL;
+    cover_show(cur);
     if (t) {
         lv_label_set_text(p_title, t->title);
         char sub[96];
@@ -342,7 +442,9 @@ void music_open(lv_obj_t *launcher)
     scr_player = sys_screen_create_root("\xD0\x9C\xD1\x83\xD0\xB7\xD1\x8B\xD0\xBA\xD0\xB0", exit_cb, &body);   // Музыка
     abs_body(body);
 
-    art_view(body, 144, 24, 133, 7);
+    cover_free();
+    cover_for = -2;
+    p_art_img = lv_obj_get_child(art_view(body, 144, 24, 133, 7), 0);
     p_title = label(body, "", WATCH_FONT_BOLD, 0xFFFFFF, 20, 160, 370, LV_TEXT_ALIGN_CENTER);
     p_sub   = label(body, "", WATCH_FONT_SMALL, WS_TEXT2, 20, 196, 370, LV_TEXT_ALIGN_CENTER);
 
