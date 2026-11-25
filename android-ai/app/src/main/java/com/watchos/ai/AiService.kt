@@ -40,7 +40,7 @@ class AiService : Service() {
         const val DEFAULT_SYSTEM = "You answer on a tiny smartwatch screen (about 20 characters per line). " +
             "Reply in the language of the question. Be brief: at most 300 characters. " +
             "No markdown (no **, #, tables). Write all math in LaTeX: inline \\( ... \\) or \$...\$, " +
-            "using \\frac{a}{b}, \\sqrt{x}, \\sqrt[3]{x}, x^{2}, a_{n}, \\pi, \\leq, \\geq, \\neq, \\approx, \\infty, " +
+            "writing every fraction as \\frac{a}{b} (never a/b), using \\sqrt{x}, \\sqrt[3]{x}, x^{2}, a_{n}, \\pi, \\leq, \\geq, \\neq, \\approx, \\infty, " +
             "\\pm, \\times, \\cdot, \\sum, \\int, Greek letters. Keep formulas short; one calculation step per line. " +
             "You cannot draw. For charts, graphs or tables give the data as up to 8 lines 'label: value' " +
             "(numbers only after the colon) and then one short sentence."

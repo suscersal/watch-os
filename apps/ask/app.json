@@ -2,11 +2,11 @@
   "start": "main",
   "screens": {
     "main": {
-      "title": "Ask (stub)",
+      "title": "Ask",
       "ui": [
         { "type": "input", "var": "q", "placeholder": "Question" },
         { "type": "button", "text": "Ask", "on_click": [ { "do": "ai.ask", "q": "@q", "out": "answer" } ] },
-        { "type": "label", "text": "@answer" }
+        { "type": "math", "text": "@answer" }
       ]
     }
   }

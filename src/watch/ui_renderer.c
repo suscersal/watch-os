@@ -183,6 +183,152 @@ static bool table_from_rows(wtable_t *t, const cJSON *rows)
 
 static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, bool in_row);
 
+// ---- math: текст с дробями, нарисованными стопкой ----
+// Дробь приходит от телефона (MathFormat.kt) как FR_A числитель FR_B знаменатель FR_C. Строки без дробей - обычная метка,
+// строки с дробями - ряд с переносом: слова-метки и дроби (числитель, черта, знаменатель).
+#define FR_A '\x01'
+#define FR_B '\x02'
+#define FR_C '\x03'
+
+static void math_words(lv_obj_t *row, const char *s, size_t n)
+{
+    size_t i = 0;
+    while (i < n) {
+        size_t st = i;
+        while (i < n && s[i] != ' ') i++;
+        while (i < n && s[i] == ' ') i++;
+        char w[64];
+        size_t k = i - st;
+        if (k > sizeof w - 1) k = sizeof w - 1;
+        while (k > 0 && ((unsigned char)s[st + k] & 0xC0) == 0x80) k--;   // не разрезать символ UTF-8
+        if (k == 0) { i = st + 1; continue; }
+        memcpy(w, s + st, k);
+        w[k] = '\0';
+        lv_obj_t *l = lv_label_create(row);
+        lv_label_set_text(l, w);
+    }
+}
+
+static void math_frac(lv_obj_t *row, const char *a, size_t an, const char *b, size_t bn)
+{
+    char na[96], nb[96];
+    if (an > sizeof na - 1) an = sizeof na - 1;
+    if (bn > sizeof nb - 1) bn = sizeof nb - 1;
+    memcpy(na, a, an); na[an] = '\0';
+    memcpy(nb, b, bn); nb[bn] = '\0';
+
+    const lv_font_t *f = lv_obj_get_style_text_font(row, LV_PART_MAIN);
+    lv_point_t sa, sb;
+    lv_text_get_size(&sa, na, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    lv_text_get_size(&sb, nb, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    int32_t w = (sa.x > sb.x ? sa.x : sb.x) + 8;
+
+    lv_obj_t *col = lv_obj_create(row);
+    lv_obj_remove_style_all(col);
+    lv_obj_remove_flag(col, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_hor(col, 3, 0);
+    lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    lv_obj_t *num = lv_label_create(col);
+    lv_label_set_long_mode(num, LV_LABEL_LONG_CLIP);
+    lv_obj_set_width(num, w);
+    lv_obj_set_style_text_align(num, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(num, na);
+
+    lv_obj_t *den = lv_label_create(col);
+    lv_label_set_long_mode(den, LV_LABEL_LONG_CLIP);
+    lv_obj_set_width(den, w);
+    lv_obj_set_style_text_align(den, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_border_width(den, 2, 0);                       // черта дроби - верхняя граница знаменателя
+    lv_obj_set_style_border_side(den, LV_BORDER_SIDE_TOP, 0);
+    lv_obj_set_style_border_color(den, lv_obj_get_style_text_color(row, LV_PART_MAIN), 0);
+    lv_obj_set_style_pad_top(den, 2, 0);
+    lv_label_set_text(den, nb);
+}
+
+static void math_line(lv_obj_t *box, const char *s, size_t n)
+{
+    if (n == 0) {                                                   // пустая строка - небольшой отступ
+        lv_obj_t *sp = lv_obj_create(box);
+        lv_obj_remove_style_all(sp);
+        lv_obj_set_size(sp, 1, 8);
+        return;
+    }
+    if (!memchr(s, FR_A, n)) {                                      // дробей нет: обычная метка с переносом
+        char *t = malloc(n + 1);
+        if (!t) return;
+        memcpy(t, s, n); t[n] = '\0';
+        lv_obj_t *l = lv_label_create(box);
+        lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(l, lv_pct(100));
+        lv_label_set_text(l, t);
+        free(t);
+        return;
+    }
+    lv_obj_t *row = lv_obj_create(box);
+    lv_obj_remove_style_all(row);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, 0, 0);
+    lv_obj_set_style_pad_row(row, 2, 0);
+
+    const char *end = s + n;
+    while (s < end) {
+        const char *a = memchr(s, FR_A, (size_t)(end - s));
+        if (!a) { math_words(row, s, (size_t)(end - s)); break; }
+        const char *b = memchr(a + 1, FR_B, (size_t)(end - a - 1));
+        const char *c = b ? memchr(b + 1, FR_C, (size_t)(end - b - 1)) : NULL;
+        math_words(row, s, (size_t)(a - s));
+        if (!b || !c) { math_words(row, a + 1, (size_t)(end - a - 1)); break; }   // обрезанная дробь - как текст
+        math_frac(row, a + 1, (size_t)(b - a - 1), b + 1, (size_t)(c - b - 1));
+        s = c + 1;
+    }
+}
+
+// Пересобирает содержимое блока math из text. Вызывается при создании и при смене переменных.
+void ui_math_fill(lv_obj_t *box, const char *text)
+{
+    lv_obj_clean(box);
+    const char *p = text;
+    while (1) {
+        const char *nl = strchr(p, '\n');
+        size_t n = nl ? (size_t)(nl - p) : strlen(p);
+        math_line(box, p, n);
+        if (!nl) break;
+        p = nl + 1;
+    }
+}
+
+static void add_math(bctx_t *c, lv_obj_t *parent, const cJSON *n, bool in_row)
+{
+    lv_obj_t *box = lv_obj_create(parent);
+    lv_obj_remove_style_all(box);
+    lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_height(box, LV_SIZE_CONTENT);
+    if (in_row) lv_obj_set_flex_grow(box, 1); else lv_obj_set_width(box, lv_pct(100));
+    lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_gap(box, 4, 0);
+    lv_obj_set_style_text_color(box, lv_color_hex(jcolor(n, "color", 0xFFFFFF)), 0);
+    const lv_font_t *f = font_for(jstr(n, "size"));
+    if (f) lv_obj_set_style_text_font(box, f, 0);
+
+    const char *t = jstr(n, "text") ? jstr(n, "text") : "";
+    static char buf[VAR_EXP];   // не на стеке: ответ ИИ длинный
+    vars_expand(t, buf, sizeof buf);
+    ui_math_fill(box, buf);
+    if (strchr(t, '@') && c->r->nbind < MAX_BIND) {
+        bind_t *b = &c->r->binds[c->r->nbind++];
+        b->obj = box;
+        b->kind = BIND_MATH;
+        snprintf(b->tmpl, sizeof b->tmpl, "%s", t);
+    }
+}
+
+
 static void add_children(bctx_t *c, lv_obj_t *parent, const cJSON *arr, int depth, bool in_row)
 {
     if (!cJSON_IsArray(arr)) return;
@@ -210,6 +356,9 @@ static void add_widget(bctx_t *c, lv_obj_t *parent, const cJSON *n, int depth, b
         const lv_font_t *f = font_for(jstr(n, "size"));
         if (f) lv_obj_set_style_text_font(l, f, 0);
         set_bound_text(c->r, l, jstr(n, "text") ? jstr(n, "text") : "");
+
+    } else if (strcmp(type, "math") == 0) {
+        add_math(c, parent, n, in_row);
 
     } else if (strcmp(type, "button") == 0) {
         lv_obj_t *b = lv_button_create(parent);

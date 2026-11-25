@@ -115,6 +115,7 @@ void app_refresh_bindings(app_run_t *r)
         }
         static char buf[VAR_EXP];   // не на стеке: ответ ИИ длинный
         vars_expand(r->binds[i].tmpl, buf, sizeof buf);
-        lv_label_set_text(r->binds[i].obj, buf);
+        if (r->binds[i].kind == BIND_MATH) ui_math_fill(r->binds[i].obj, buf);
+        else lv_label_set_text(r->binds[i].obj, buf);
     }
 }

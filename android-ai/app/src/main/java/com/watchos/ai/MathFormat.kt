@@ -6,6 +6,17 @@ package com.watchos.ai
  * см. src/watch/fonts/README.md): √(x), x², aₙ, π, ≤ ≥ ≠ ≈ ∞ ± × ÷ ∑ ∫ → ...
  */
 object MathFormat {
+    /** Маркеры дроби для часов: FR_A числитель FR_B знаменатель FR_C. Часы рисуют такую дробь стопкой (виджет math). */
+    const val FR_A = '\u0001'
+    const val FR_B = '\u0002'
+    const val FR_C = '\u0003'
+
+    private fun isFlat(t: String) = t.isNotEmpty() && t.length <= 40 && t.none { it == FR_A || it == FR_B || it == FR_C || it == '\n' }
+    /** Дробь внутри дроби: рисуем в строку (a)/(b), стопкой только один уровень. */
+    private fun inline(t: String) = t.replace(FR_A.toString(), "(").replace("$FR_B", ")/(").replace(FR_C.toString(), ")")
+
+    // 1/2, √3/2, 2√3/3, π/6: простые дроби в обычном тексте (не даты и не пути: вокруг нет букв, цифр, '/' и '.')
+    private val PLAIN_FRAC = Regex("(?<![\\w/.])(\\d*√\\d+|\\d+(?:\\.\\d+)?|π)/(\\d+)(?![\\w/.])")
     private val SUP = mapOf('0' to '⁰', '1' to '¹', '2' to '²', '3' to '³', '4' to '⁴', '5' to '⁵', '6' to '⁶',
         '7' to '⁷', '8' to '⁸', '9' to '⁹', '+' to '⁺', '-' to '⁻', '−' to '⁻', 'n' to 'ⁿ')
     private val SUB = mapOf('0' to '₀', '1' to '₁', '2' to '₂', '3' to '₃', '4' to '₄', '5' to '₅', '6' to '₆',
@@ -57,7 +68,12 @@ object MathFormat {
                     when {
                         cmd == "frac" || cmd == "dfrac" -> {
                             val a = group(s, j); val b = a?.let { group(s, it.second) }
-                            if (a != null && b != null) { out.append(wrap(format(a.first))).append('/').append(wrap(format(b.first))); i = b.second }
+                            if (a != null && b != null) {
+                                val na = format(a.first).trim(); val nb = format(b.first).trim()
+                                if (isFlat(na) && isFlat(nb)) out.append(FR_A).append(na).append(FR_B).append(nb).append(FR_C)
+                                else out.append(wrap(inline(na))).append('/').append(wrap(inline(nb)))
+                                i = b.second
+                            }
                             else i = j
                         }
                         cmd == "sqrt" -> {
@@ -103,7 +119,8 @@ object MathFormat {
             }
         }
         // sqrt(x) -> √(x), x^2 уже обработано выше; лишние пробелы и пустые строки
-        return out.toString().replace(Regex("[ \\t]+\\n"), "\n").replace(Regex("(?m)^[ \\t]+"), "").replace(Regex("\\n{3,}"), "\n\n").trim()
+        return out.toString().replace(PLAIN_FRAC) { "$FR_A${it.groupValues[1]}$FR_B${it.groupValues[2]}$FR_C" }
+            .replace(Regex("[ \\t]+\\n"), "\n").replace(Regex("(?m)^[ \\t]+"), "").replace(Regex("\\n{3,}"), "\n\n").trim()
     }
 
     /** Обрезает строку до maxBytes в UTF-8, не разрезая символ, и ставит многоточие. */
