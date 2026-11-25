@@ -31,6 +31,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var key: EditText
     private lateinit var model: EditText
+    private lateinit var system: EditText
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
@@ -57,8 +58,19 @@ class MainActivity : Activity() {
             hint = "Model"
             setText(prefs.getString("model", AiService.DEFAULT_MODEL))
         }
+        system = EditText(this).apply {
+            hint = "System prompt (answer format)"
+            setText(prefs.getString("system", "")?.ifBlank { null } ?: AiService.DEFAULT_SYSTEM)
+            minLines = 4
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
         root.addView(key)
         root.addView(model)
+        root.addView(system)
+        root.addView(Button(this).apply {
+            text = "Reset prompt to default"
+            setOnClickListener { system.setText(AiService.DEFAULT_SYSTEM) }
+        })
         root.addView(Button(this).apply {
             text = "Choose model (free / paid list)"
             setOnClickListener { loadModels() }
@@ -68,7 +80,8 @@ class MainActivity : Activity() {
             text = "Save and start"
             setOnClickListener {
                 prefs.edit().putString("key", key.text.toString().trim())
-                    .putString("model", model.text.toString().trim().ifEmpty { AiService.DEFAULT_MODEL }).apply()
+                    .putString("model", model.text.toString().trim().ifEmpty { AiService.DEFAULT_MODEL })
+                    .putString("system", system.text.toString().trim()).apply()
                 startForegroundService(Intent(this@MainActivity, AiService::class.java))
                 status.postDelayed({ refresh() }, 600)
             }
@@ -78,6 +91,20 @@ class MainActivity : Activity() {
             setOnClickListener {
                 stopService(Intent(this@MainActivity, AiService::class.java))
                 status.postDelayed({ refresh() }, 300)
+            }
+        })
+
+        // Без этого Android может «замораживать» приложение в фоне (например, пока открыт эмулятор часов),
+        // и ответ приходит только когда Watch AI выводят на экран.
+        root.addView(Button(this).apply {
+            text = "Allow background work (battery)"
+            setOnClickListener {
+                try {
+                    startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        android.net.Uri.parse("package:$packageName")))
+                } catch (_: Exception) {
+                    startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                }
             }
         })
 

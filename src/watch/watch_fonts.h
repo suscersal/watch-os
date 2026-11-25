@@ -10,6 +10,9 @@ LV_FONT_DECLARE(watch_font_b28)
 LV_FONT_DECLARE(watch_font_d40)
 LV_FONT_DECLARE(watch_font_d64)
 LV_FONT_DECLARE(watch_font_d96)
+LV_FONT_DECLARE(watch_font_math_14)   // запасные шрифты с математикой (подключены как fallback к 14/20/28/b20/b28)
+LV_FONT_DECLARE(watch_font_math_20)
+LV_FONT_DECLARE(watch_font_math_28)
 
 #define WATCH_FONT_SMALL  (&watch_font_14)
 #define WATCH_FONT_BODY   (&watch_font_20)    // шрифт по умолчанию

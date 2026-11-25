@@ -113,7 +113,7 @@ void app_refresh_bindings(app_run_t *r)
             lv_bar_set_value(r->binds[i].obj, (int32_t)strtod(vars_get(r->binds[i].tmpl), NULL), LV_ANIM_OFF);
             continue;
         }
-        char buf[BIND_TMPL];
+        static char buf[VAR_EXP];   // не на стеке: ответ ИИ длинный
         vars_expand(r->binds[i].tmpl, buf, sizeof buf);
         lv_label_set_text(r->binds[i].obj, buf);
     }

@@ -38,7 +38,7 @@ static const lv_font_t *font_for(const char *size)
 static void set_bound_text(app_run_t *r, lv_obj_t *l, const char *t)
 {
     if (!strchr(t, '@')) { lv_label_set_text(l, t); return; }
-    char buf[BIND_TMPL];
+    static char buf[VAR_EXP];   // не на стеке: ответ ИИ длинный
     vars_expand(t, buf, sizeof buf);
     lv_label_set_text(l, buf);
     if (r->nbind < MAX_BIND) {

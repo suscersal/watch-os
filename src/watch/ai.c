@@ -9,7 +9,7 @@
 #define AI_TIMEOUT_S  60
 
 // Копирует s в out не больше outn-1 байт, не разрезая символ UTF-8; если пришлось обрезать, в конце многоточие.
-static void copy_trim(char *out, size_t outn, const char *s)
+static void copy_trim(char *out, size_t outn, const char *s, bool keep_nl)
 {
     while (*s == ' ' || *s == '\n' || *s == '\r' || *s == '\t') s++;
     size_t n = strlen(s);
@@ -20,7 +20,10 @@ static void copy_trim(char *out, size_t outn, const char *s)
         if (k > 3) k -= 3;                                   // место под "..."
         while (k > 0 && ((unsigned char)s[k] & 0xC0) == 0x80) k--;   // не разрезать символ
     }
-    for (size_t i = 0; i < k; i++) out[i] = (s[i] == '\n' || s[i] == '\r' || s[i] == '\t') ? ' ' : s[i];
+    for (size_t i = 0; i < k; i++) {
+        char c = s[i];
+        out[i] = (c == '\r' || c == '\t' || (c == '\n' && !keep_nl)) ? ' ' : c;
+    }
     if (cut) { memcpy(out + k, "...", 3); k += 3; }
     out[k] = '\0';
 }
@@ -51,12 +54,12 @@ bool ai_ask(const char *question, char *out, size_t outn, char *err, size_t errn
     }
     if (status != 200) {
         char msg[96];
-        copy_trim(msg, sizeof msg, ans[0] ? ans : "Phone app error");
+        copy_trim(msg, sizeof msg, ans[0] ? ans : "Phone app error", false);
         snprintf(err, errn, "%s", msg);
         free(ans);
         return false;
     }
-    copy_trim(out, outn, ans);
+    copy_trim(out, outn, ans, true);   // переводы строк сохраняем: шаги решения, списки
     free(ans);
     return true;
 }

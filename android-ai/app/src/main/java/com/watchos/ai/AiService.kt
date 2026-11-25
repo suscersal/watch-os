@@ -37,8 +37,14 @@ class AiService : Service() {
         const val PORT = 8787
         const val DEFAULT_MODEL = "openai/gpt-4o-mini"
         private const val CHANNEL = "ai_bridge"
-        private const val SYSTEM = "You answer on a tiny smartwatch screen. Reply in the language of the question, " +
-            "in one or two short sentences, plain text only, no markdown, no lists."
+        const val DEFAULT_SYSTEM = "You answer on a tiny smartwatch screen (about 20 characters per line). " +
+            "Reply in the language of the question. Be brief: at most 300 characters. " +
+            "Plain text only: no markdown, no LaTeX, no \$ signs, no tables. " +
+            "Write math with Unicode symbols: √(x), x², x³, aₙ, π, ≤ ≥ ≠ ≈ ∞ ± × ÷ ∑; fractions as a/b; " +
+            "one calculation step per line. " +
+            "You cannot draw. For charts, graphs or tables give the data as up to 8 lines 'label: value' " +
+            "(numbers only after the colon) and then one short sentence."
+        private const val MAX_ANSWER_BYTES = 480   // часы хранят ответ в 512 байтах (VAR_VAL)
         @Volatile var running = false
         @Volatile var info = ""
     }
@@ -110,7 +116,8 @@ class AiService : Service() {
                     else -> {
                         val q = try { JSONObject(String(req.second, Charsets.UTF_8)).getString("q") } catch (_: Exception) { "" }
                         if (q.isBlank()) { reply(out, 400, "Empty question"); return }
-                        val answer = ask(q.trim())
+                        info = "${now()} asking: ${q.take(40)}"
+                        val answer = MathFormat.limitBytes(MathFormat.format(ask(q.trim())), MAX_ANSWER_BYTES)
                         info = "${now()} OK: ${q.take(40)}"
                         reply(out, 200, answer)
                     }
@@ -170,13 +177,14 @@ class AiService : Service() {
         val prefs = getSharedPreferences("ai", MODE_PRIVATE)
         val key = prefs.getString("key", "")?.trim().orEmpty()
         val model = prefs.getString("model", DEFAULT_MODEL)?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_MODEL
+        val system = prefs.getString("system", "")?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_SYSTEM
         if (key.isEmpty()) throw ApiError(503, "No API key in Watch AI app")
 
         val body = JSONObject()
             .put("model", model)
-            .put("max_tokens", 600)   // запас: «думающие» модели тратят часть токенов на рассуждение
+            .put("max_tokens", 800)   // запас: «думающие» модели тратят часть токенов на рассуждение
             .put("messages", JSONArray()
-                .put(JSONObject().put("role", "system").put("content", SYSTEM))
+                .put(JSONObject().put("role", "system").put("content", system))
                 .put(JSONObject().put("role", "user").put("content", q)))
             .toString()
 

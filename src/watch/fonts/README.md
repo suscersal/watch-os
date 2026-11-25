@@ -23,3 +23,10 @@
     lv_font_conv --bpp 4 --size 40 --no-compress --font $F/inter-latin-500-normal.woff \
       -r "0x20,0x2E,0x30-0x3A" --format lvgl --lv-font-name watch_font_d40 \
       --lv-include "lvgl/lvgl.h" --force-fast-kern-format -o watch_font_d40.c
+
+Математика (√ ² ³ ⁿ ₙ π ≤ ≥ ≠ ≈ ∞ ± × ÷ ∑ ∫ греческие, стрелки) лежит в отдельных запасных шрифтах watch_font_math_14/20/28
+(Inter из пакета fonts-inter, `.fallback` в основных шрифтах указывает на них):
+
+    R="0xB1,0xB2,0xB3,0xB9,0xBC-0xBE,0xD7,0xF7,0x394,0x3A3,0x3A9,0x3B1-0x3C9,0x2070,0x2074-0x207B,0x207F,0x2080-0x2089,0x2190-0x2193,0x2202,0x2211,0x221A,0x221E,0x222B,0x2248,0x2260,0x2264,0x2265"
+    npx lv_font_conv --bpp 4 --size 20 --no-compress --font Inter-Regular.otf -r "$R" --format lvgl \
+      --lv-font-name watch_font_math_20 --lv-include "lvgl/lvgl.h" --force-fast-kern-format -o watch_font_math_20.c
