@@ -26,7 +26,7 @@ object Relay {
                 fail(client.getOutputStream())
                 return
             }
-            val u = up
+            val u = up!!
             second(Runnable { try { pipe(client.getInputStream(), u.getOutputStream()) } catch (_: Exception) {} })
             pipe(u.getInputStream(), client.getOutputStream())     // кончается, когда Watch AI закрыл соединение (Connection: close)
         } catch (_: Exception) {
