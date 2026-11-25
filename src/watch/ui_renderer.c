@@ -248,6 +248,53 @@ static void math_frac(lv_obj_t *row, const char *a, size_t an, const char *b, si
     lv_label_set_text(den, nb);
 }
 
+// ---- график: строка PL_A xmin|xmax|ymin|ymax|v,v,v... PL_C; значения 0..100 уже посчитаны телефоном (x - нет точки) ----
+#define PL_A '\x04'
+#define PL_C '\x05'
+#define PLOT_MAX_PTS 64
+
+static void math_plot(lv_obj_t *box, const char *s, size_t n)
+{
+    char tmp[420];
+    if (n > sizeof tmp - 1) return;
+    memcpy(tmp, s, n); tmp[n] = '\0';
+    char *f[5] = { tmp, NULL, NULL, NULL, NULL };
+    for (int i = 0, k = 0; tmp[i] && k < 4; i++)
+        if (tmp[i] == '|') { tmp[i] = '\0'; f[++k] = tmp + i + 1; }
+    if (!f[4]) return;
+
+    int32_t v[PLOT_MAX_PTS];
+    int cnt = 0;
+    for (const char *p = f[4]; *p && cnt < PLOT_MAX_PTS; ) {
+        if (*p == 'x') { v[cnt++] = LV_CHART_POINT_NONE; p++; }
+        else { char *e; long x = strtol(p, &e, 10); if (e == p) break; v[cnt++] = (int32_t)x; p = e; }
+        if (*p == ',') p++;
+    }
+    if (cnt < 2) return;
+
+    lv_obj_t *ch = lv_chart_create(box);
+    lv_obj_set_size(ch, lv_pct(100), 150);
+    lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
+    lv_chart_set_point_count(ch, (uint32_t)cnt);
+    lv_chart_set_axis_range(ch, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
+    lv_chart_set_div_line_count(ch, 3, 5);
+    lv_obj_set_style_bg_color(ch, lv_color_hex(WS_CARD), 0);
+    lv_obj_set_style_border_width(ch, 0, 0);
+    lv_obj_set_style_radius(ch, 16, 0);
+    lv_obj_set_style_pad_all(ch, 10, 0);
+    lv_obj_set_style_line_color(ch, lv_color_hex(WS_FILL2), LV_PART_MAIN);   // сетка
+    lv_obj_set_style_size(ch, 0, 0, LV_PART_INDICATOR);                      // без точек
+    lv_obj_set_style_line_width(ch, 3, LV_PART_ITEMS);
+    lv_chart_series_t *se = lv_chart_add_series(ch, lv_color_hex(ws_accent()), LV_CHART_AXIS_PRIMARY_Y);
+    for (int i = 0; i < cnt; i++) lv_chart_set_series_value_by_id(ch, se, (uint32_t)i, v[i]);
+    lv_chart_refresh(ch);
+
+    lv_obj_t *cap = lv_label_create(box);
+    lv_obj_set_style_text_font(cap, WATCH_FONT_SMALL, 0);
+    lv_obj_set_style_text_color(cap, lv_color_hex(WS_TEXT2), 0);
+    lv_label_set_text_fmt(cap, "x: %s ... %s   y: %s ... %s", f[0], f[1], f[2], f[3]);
+}
+
 static void math_line(lv_obj_t *box, const char *s, size_t n)
 {
     if (n == 0) {                                                   // пустая строка - небольшой отступ
@@ -255,6 +302,10 @@ static void math_line(lv_obj_t *box, const char *s, size_t n)
         lv_obj_remove_style_all(sp);
         lv_obj_set_size(sp, 1, 8);
         return;
+    }
+    if (s[0] == PL_A) {
+        const char *e = memchr(s + 1, PL_C, n - 1);
+        if (e) { math_plot(box, s + 1, (size_t)(e - s - 1)); return; }
     }
     if (!memchr(s, FR_A, n)) {                                      // дробей нет: обычная метка с переносом
         char *t = malloc(n + 1);

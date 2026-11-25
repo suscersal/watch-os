@@ -42,7 +42,9 @@ class AiService : Service() {
             "No markdown (no **, #, tables). Write all math in LaTeX: inline \\( ... \\) or \$...\$, " +
             "writing every fraction as \\frac{a}{b} (never a/b), using \\sqrt{x}, \\sqrt[3]{x}, x^{2}, a_{n}, \\pi, \\leq, \\geq, \\neq, \\approx, \\infty, " +
             "\\pm, \\times, \\cdot, \\sum, \\int, Greek letters. Keep formulas short; one calculation step per line. " +
-            "You cannot draw. For charts, graphs or tables give the data as up to 8 lines 'label: value' " +
+            "For a graph of a function y=f(x) reply with exactly one line 'PLOT: f(x); xmin; xmax' in plain syntax " +
+            "(sin(x), x^2, sqrt(x), abs(x), ln(x), pi, no LaTeX) and then one short sentence. " +
+            "For other charts or tables give the data as up to 8 lines 'label: value' " +
             "(numbers only after the colon) and then one short sentence."
         private const val MAX_ANSWER_BYTES = 480   // часы хранят ответ в 512 байтах (VAR_VAL)
         @Volatile var running = false
@@ -117,7 +119,7 @@ class AiService : Service() {
                         val q = try { JSONObject(String(req.second, Charsets.UTF_8)).getString("q") } catch (_: Exception) { "" }
                         if (q.isBlank()) { reply(out, 400, "Empty question"); return }
                         info = "${now()} asking: ${q.take(40)}"
-                        val answer = MathFormat.limitBytes(MathFormat.format(ask(q.trim())), MAX_ANSWER_BYTES)
+                        val answer = MathFormat.limitBytes(MathFormat.format(Plot.process(ask(q.trim()))), MAX_ANSWER_BYTES)
                         info = "${now()} OK: ${q.take(40)}"
                         reply(out, 200, answer)
                     }
