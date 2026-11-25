@@ -145,14 +145,14 @@ class MainActivity : Activity() {
         val pad = (12 * resources.displayMetrics.density).toInt()
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(pad, pad, pad, 0) }
         val freeOnly = CheckBox(this).apply { text = "Free only"; isChecked = true }
-        val hint = TextView(this).apply {
+        val limitsNote = TextView(this).apply {
             text = "openrouter/free = сам берёт любую свободную бесплатную модель. Лимит бесплатных: 20 запросов/мин и 50/день на весь аккаунт (1000/день после пополнения от \$10)."
             textSize = 12f
         }
         val search = EditText(this).apply { hint = "Search" }
         val listView = ListView(this)
         box.addView(freeOnly)
-        box.addView(hint)
+        box.addView(limitsNote)
         box.addView(search)
         box.addView(listView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (resources.displayMetrics.heightPixels * 0.5).toInt()))
 
