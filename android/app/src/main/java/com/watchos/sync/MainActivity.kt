@@ -97,6 +97,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        try { startForegroundService(Intent(this, AiRelayService::class.java)) } catch (_: Exception) {}   // мост ИИ для часов
         showNotifyStatus()
     }
 

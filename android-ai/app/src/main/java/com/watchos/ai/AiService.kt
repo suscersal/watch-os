@@ -14,6 +14,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
@@ -23,7 +24,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * Мост ИИ для часов (docs/ai-bridge.md): на порту 8787 принимает POST /ask {"q":"..."} от часов по сети раздачи
+ * Мост ИИ для часов (docs/ai-bridge.md): на 127.0.0.1:8788 (только loopback) принимает POST /ask {"q":"..."}; часы доходят сюда через Watch Sync (порт 8787, вне VPN)
  * и отвечает обычным текстом. Сам идёт в OpenRouter; ключ хранится только в настройках этого приложения.
  * Для часов: 200 + текст ответа, иначе 4xx/5xx + текст ошибки.
  */
@@ -34,7 +35,7 @@ class AiService : Service() {
     private val apiLock = Any()      // к OpenRouter идёт один запрос за раз
 
     companion object {
-        const val PORT = 8787
+        const val PORT = 8788       // только loopback: приложение под VPN, ответы в раздачу из него не доходят
         const val DEFAULT_MODEL = "openai/gpt-4o-mini"
         private const val CHANNEL = "ai_bridge"
         const val DEFAULT_SYSTEM = "You answer on a tiny smartwatch screen (about 20 characters per line). " +
@@ -66,7 +67,7 @@ class AiService : Service() {
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "AI bridge", NotificationManager.IMPORTANCE_LOW))
         val n = Notification.Builder(this, CHANNEL)
             .setContentTitle("Watch AI is running")
-            .setContentText("Answering the watch on port $PORT")
+            .setContentText("Answering the watch via Watch Sync (127.0.0.1:$PORT)")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
             .build()
@@ -94,7 +95,7 @@ class AiService : Service() {
     private fun startServer() {
         Thread {
             try {
-                val ss = ServerSocket(PORT, 8)
+                val ss = ServerSocket(PORT, 8, InetAddress.getByName("127.0.0.1"))
                 server = ss
                 running = true
                 info = "Listening on port $PORT"

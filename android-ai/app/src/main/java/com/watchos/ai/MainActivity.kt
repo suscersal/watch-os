@@ -116,12 +116,8 @@ class MainActivity : Activity() {
     override fun onResume() { super.onResume(); refresh() }
 
     private fun refresh() {
-        val ips = try {
-            NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp && !it.isLoopback }
-                .flatMap { n -> n.inetAddresses.toList().filterIsInstance<Inet4Address>().map { "${n.name}: ${it.hostAddress}" } }
-        } catch (_: Exception) { emptyList() }
-        status.text = (if (AiService.running) "Running, port ${AiService.PORT}" else "Stopped") +
-            "\n" + AiService.info + "\n\nAddresses:\n" + ips.joinToString("\n")
+        status.text = (if (AiService.running) "Running, loopback port ${AiService.PORT}" else "Stopped") +
+            "\n" + AiService.info + "\n\nThe watch connects through the Watch Sync app (port 8787, no VPN): keep it installed and open it once."
     }
 
     // ---------- выбор модели ----------
