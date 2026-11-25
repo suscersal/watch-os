@@ -7,6 +7,7 @@
 #include "music_app.h"
 #include "recorder_app.h"
 #include "timer_app.h"
+#include "calc_app.h"
 #include "security_app.h"
 #include "gallery_app.h"
 #include "messages_app.h"
@@ -149,6 +150,15 @@ size_t app_manager_scan(const char *root)
         snprintf(a->icon, sizeof a->icon, "timer");
         a->color = 0xFF8800;
         a->builtin = timer_open;
+    }
+    if (napps < APPS_MAX) {
+        app_info_t *a = &apps[napps++];
+        memset(a, 0, sizeof *a);
+        snprintf(a->id, sizeof a->id, "sys_calc");
+        snprintf(a->name, sizeof a->name, "Калькулятор");
+        snprintf(a->icon, sizeof a->icon, "calc");
+        a->color = 0xFF9F0A;
+        a->builtin = calc_open;
     }
     if (napps < APPS_MAX) {
         app_info_t *a = &apps[napps++];

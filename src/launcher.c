@@ -29,7 +29,10 @@
 #define SCR_H    502
 #define ICON     112    // диаметр иконки в покое
 #define PITCH_X  110    // шаг по горизонтали
-#define PITCH_Y  95     // шаг по вертикали (~ PITCH_X * 0.866 - сотовая сетка)
+#define PITCH_Y  135    // шаг по вертикали: под иконкой место для подписи (без подписей было 95 - сотовая сетка вплотную)
+#define LABEL_W  104    // ширина подписи; длинные названия обрезаются многоточием
+#define LABEL_GAP 4     // зазор между иконкой и подписью
+#define LABEL_H  20     // высота строки подписи (учитывается при центрировании сетки)
 #define ICON_GLYPH_SCALE 340   // масштаб глифа внутри иконки, 256 = 100%
 #define MIN_TOP  30     // отступ сверху, если сетка не помещается и прокручивается
 
@@ -184,7 +187,7 @@ static void build_grid(void)
         size_t cols = (rows % 2 == 0) ? 3 : 4;
         left = left > cols ? left - cols : 0;
     }
-    int grid_h = (rows - 1) * PITCH_Y + ICON;
+    int grid_h = (rows - 1) * PITCH_Y + ICON + LABEL_GAP + LABEL_H;
     int y0 = (SCR_H - grid_h) / 2;            // небольшая сетка стоит по центру экрана, как на часах
     if (y0 < MIN_TOP) y0 = MIN_TOP;           // большая прокручивается
 
@@ -211,6 +214,18 @@ static void build_grid(void)
             lv_obj_set_style_border_opa(btn, LV_OPA_20, 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_add_event_cb(btn, app_cb, LV_EVENT_CLICKED, (void *)app_manager_get(i));
+
+            // подпись под иконкой: потомок кнопки, поэтому масштабируется и двигается вместе с ней (fisheye)
+            lv_obj_set_style_pad_all(btn, 0, 0);
+            lv_obj_add_flag(btn, LV_OBJ_FLAG_OVERFLOW_VISIBLE);       // иначе подпись за краем кнопки обрежется
+            lv_obj_t *cap = lv_label_create(btn);
+            lv_label_set_long_mode(cap, LV_LABEL_LONG_DOT);
+            lv_obj_set_width(cap, LABEL_W);
+            lv_label_set_text(cap, app_manager_get(i)->name);
+            lv_obj_set_style_text_font(cap, WATCH_FONT_SMALL, 0);
+            lv_obj_set_style_text_color(cap, lv_color_white(), 0);
+            lv_obj_set_style_text_align(cap, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(cap, LV_ALIGN_BOTTOM_MID, 0, LABEL_GAP + lv_font_get_line_height(WATCH_FONT_SMALL));
 
             const lv_image_dsc_t *img = icon_image(app_manager_get(i)->icon);
             if (img) {   // готовая круглая иконка (assets/icons): кружок и глиф уже внутри картинки
