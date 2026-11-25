@@ -11,11 +11,14 @@ object Plot {
     const val PL_A = '\u0004'
     const val PL_C = '\u0005'
     private const val POINTS = 40
-    private val LINE = Regex("(?mi)^\\s*PLOT:\\s*(.+?)\\s*;\\s*(-?[\\d.]+)\\s*;\\s*(-?[\\d.]+)\\s*$")
+    private val LINE = Regex("(?mi)^\\s*PLOT:\\s*(.+?)\\s*;\\s*([^;\\n]+?)\\s*;\\s*([^;\\n]+?)\\s*$")   // границы могут быть выражениями: -2*pi; 2*pi
 
     fun process(answer: String): String = answer.replace(LINE) { m ->
-        try { build(m.groupValues[1], m.groupValues[2].toDouble(), m.groupValues[3].toDouble()) } catch (_: Exception) { "" }
+        try { build(m.groupValues[1], bound(m.groupValues[2]), bound(m.groupValues[3])) } catch (_: Exception) { "" }
     }
+
+    /** Граница x: число или константное выражение (pi, -2*pi, 2π, 3/2). */
+    private fun bound(src: String): Double = Expr(src).eval(0.0)
 
     private fun fmt(d: Double): String {
         val r = (d * 100).roundToInt() / 100.0
