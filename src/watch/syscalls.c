@@ -1,4 +1,5 @@
 #include "syscalls.h"
+#include "ai.h"
 #include "storage.h"
 #include "sys_ui.h"
 #include "tables.h"
@@ -65,13 +66,18 @@ static void sc_toast(app_run_t *r, const cJSON *a)
     sys_toast(t);
 }
 
-// Заглушка. Позже здесь будет запрос к API через HAL-сеть.
+// Вопрос ИИ через телефон (приложение Watch AI, docs/ai-bridge.md). Вызов блокирующий; ответ обрезается до VAR_VAL.
 static void sc_ai_ask(app_run_t *r, const cJSON *a)
 {
     LV_UNUSED(r);
-    char q[VAR_VAL - 16], res[VAR_VAL];
+    char q[VAR_VAL - 16], res[VAR_VAL], err[96];
     arg_text(a, "q", q, sizeof q);
-    snprintf(res, sizeof res, "(stub) %s", q);
+    sys_toast("Asking AI...");
+    lv_refr_now(NULL);                      // запрос блокирующий: сначала рисуем статус
+    if (!ai_ask(q, res, sizeof res, err, sizeof err)) {
+        snprintf(res, sizeof res, "Error: %s", err);
+        sys_toast(err);
+    }
     const char *out = jstr(a, "out");
     vars_set(vars_valid_name(out) ? out : "result", res);
 }

@@ -1,0 +1,51 @@
+name: Android AI APK
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - 'android-ai/**'
+      - '.github/workflows/android-ai.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # нужно для создания релиза
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug APK
+        working-directory: android-ai
+        run: gradle --no-daemon assembleDebug
+      - name: Release tag
+        id: rel
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cp android-ai/app/build/outputs/apk/debug/app-debug.apk watch-ai-debug.apk
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "pre=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=build-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "pre=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish release
+        if: steps.rel.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.rel.outputs.tag }}
+          prerelease: ${{ steps.rel.outputs.pre == 'true' }}
+          files: watch-ai-debug.apk
