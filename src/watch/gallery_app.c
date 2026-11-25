@@ -33,6 +33,8 @@ static uint32_t  ids[PHOTOS_MAX], taken[PHOTOS_MAX];
 static int       n_ids, idx = -1;
 static lv_timer_t *thumb_timer, *full_timer;   // миниатюры подгружаются по две за тик; полный кадр декодируется после показа окна
 static int       thumb_next, thumb_total;
+static bool      zoomed;                       // просмотр приближен (двойное касание); тогда перетаскивание двигает кадр
+static int       pan_x, pan_y;
 static bool      grid_dirty;                   // список фото изменился (удаление): сетку надо перестроить
 
 static void build_grid(void);
@@ -125,6 +127,8 @@ static void viewer_gone_cb(lv_event_t *e)
     imgbuf_free(view_buf);
     view_buf = NULL;
     view_scr = view_img = view_count = view_date = NULL;
+    zoomed = false;
+    pan_x = pan_y = 0;
     idx = -1;
 }
 
@@ -148,9 +152,55 @@ int gallery_viewer_index(void) { return view_scr ? idx : -1; }
 
 static void step_cb(lv_event_t *e) { gallery_viewer_step((int)(intptr_t)lv_event_get_user_data(e)); }
 
+#define ZOOM_SCALE 512   // 256 = 1x, 512 = 2x
+
+static void zoom_apply(void)
+{
+    if (!view_img) return;
+    lv_image_set_scale(view_img, zoomed ? ZOOM_SCALE : 256);
+    if (!zoomed) pan_x = pan_y = 0;
+    lv_obj_set_style_translate_x(view_img, pan_x, 0);
+    lv_obj_set_style_translate_y(view_img, pan_y, 0);
+}
+
+static void zoom_reset(void) { zoomed = false; pan_x = pan_y = 0; zoom_apply(); }
+
+// Двойное касание: приблизить 2x / вернуть. Нажатия на кнопки сюда не доходят, у них свои обработчики.
+static void zoom_toggle_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    zoomed = !zoomed;
+    zoom_apply();
+}
+
+// Приближено: перетаскивание двигает кадр, но не дальше его краёв.
+static void pan_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    if (!zoomed || !view_img) return;
+    lv_indev_t *in = lv_indev_active();
+    if (!in) return;
+    lv_point_t v;
+    lv_indev_get_vect(in, &v);
+    int32_t iw = lv_obj_get_width(view_img), ih = lv_obj_get_height(view_img);
+    int32_t sw = lv_obj_get_width(view_scr), sh = lv_obj_get_height(view_scr);
+    int32_t mx = (iw * ZOOM_SCALE / 256 - sw) / 2, my = (ih * ZOOM_SCALE / 256 - sh) / 2;
+    if (mx < 0) mx = 0;
+    if (my < 0) my = 0;
+    pan_x += v.x;
+    pan_y += v.y;
+    if (pan_x > mx) pan_x = mx;
+    if (pan_x < -mx) pan_x = -mx;
+    if (pan_y > my) pan_y = my;
+    if (pan_y < -my) pan_y = -my;
+    lv_obj_set_style_translate_x(view_img, pan_x, 0);
+    lv_obj_set_style_translate_y(view_img, pan_y, 0);
+}
+
 static void gesture_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
+    if (zoomed) return;                         // при приближении свайп двигает кадр, а не листает фото
     lv_indev_t *in = lv_indev_active();
     if (!in) return;
     lv_dir_t d = lv_indev_get_gesture_dir(in);
@@ -175,6 +225,7 @@ static void full_timer_cb(lv_timer_t *t)
 static void viewer_show(int i)
 {
     idx = i;
+    zoom_reset();
     if (full_timer) { lv_timer_delete(full_timer); full_timer = NULL; }
     imgbuf_t *tb = imgbuf_load(ids[i], true);
     lv_image_set_src(view_img, tb ? &tb->dsc : NULL);
@@ -238,6 +289,8 @@ static void viewer_open(int start)
     lv_obj_set_style_pad_all(view_scr, 0, 0);
     lv_obj_add_event_cb(view_scr, viewer_gone_cb, LV_EVENT_DELETE, NULL);
     lv_obj_add_event_cb(view_scr, gesture_cb, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(view_scr, zoom_toggle_cb, LV_EVENT_DOUBLE_CLICKED, NULL);
+    lv_obj_add_event_cb(view_scr, pan_cb, LV_EVENT_PRESSING, NULL);
 
     view_img = lv_image_create(view_scr);
     lv_obj_center(view_img);
