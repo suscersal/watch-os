@@ -219,7 +219,7 @@ size_t app_manager_scan(const char *root)
         memset(a, 0, sizeof *a);
         snprintf(a->id, sizeof a->id, "sys_buttons");
         snprintf(a->name, sizeof a->name, "Кнопки");
-        snprintf(a->icon, sizeof a->icon, "calc");
+        snprintf(a->icon, sizeof a->icon, "ok");
         a->color = 0x8B5CF6;
         a->builtin = buttons_test_open;
     }

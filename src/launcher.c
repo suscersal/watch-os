@@ -56,6 +56,7 @@ __attribute__((unused)) static void fisheye_update(lv_obj_t *cont)
     uint32_t n = lv_obj_get_child_count(cont);
     for (uint32_t k = 0; k < n; k++) {
         lv_obj_t *c = lv_obj_get_child(cont, k);
+        if (lv_obj_check_type(c, &lv_label_class)) continue;   // подписи остаются на месте
         lv_area_t a;
         lv_obj_get_coords(c, &a);
         int32_t dx = (a.x1 + a.x2) / 2 - SCR_W / 2;
@@ -215,17 +216,18 @@ static void build_grid(void)
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_add_event_cb(btn, app_cb, LV_EVENT_CLICKED, (void *)app_manager_get(i));
 
-            // подпись под иконкой: потомок кнопки, поэтому масштабируется и двигается вместе с ней (fisheye)
-            lv_obj_set_style_pad_all(btn, 0, 0);
-            lv_obj_add_flag(btn, LV_OBJ_FLAG_OVERFLOW_VISIBLE);       // иначе подпись за краем кнопки обрежется
-            lv_obj_t *cap = lv_label_create(btn);
+            // Подпись под иконкой. Это соседний с кнопкой объект, а не её потомок: потомка, вылезающего за границу кнопки,
+            // LVGL обрезает (OVERFLOW_VISIBLE растягивает область лишь на ext_draw_size, а у кнопки он 0), и подпись пропадала.
+            lv_obj_t *cap = lv_label_create(cont);
             lv_label_set_long_mode(cap, LV_LABEL_LONG_DOT);
             lv_obj_set_width(cap, LABEL_W);
             lv_label_set_text(cap, app_manager_get(i)->name);
             lv_obj_set_style_text_font(cap, WATCH_FONT_SMALL, 0);
             lv_obj_set_style_text_color(cap, lv_color_white(), 0);
             lv_obj_set_style_text_align(cap, LV_TEXT_ALIGN_CENTER, 0);
-            lv_obj_align(cap, LV_ALIGN_BOTTOM_MID, 0, LABEL_GAP + lv_font_get_line_height(WATCH_FONT_SMALL));
+            lv_obj_set_pos(cap, x0 + c * PITCH_X + (ICON - LABEL_W) / 2, y + ICON + LABEL_GAP);
+            lv_obj_add_flag(cap, LV_OBJ_FLAG_CLICKABLE);              // нажатие на подпись открывает приложение, как и на иконку
+            lv_obj_add_event_cb(cap, app_cb, LV_EVENT_CLICKED, (void *)app_manager_get(i));
 
             const lv_image_dsc_t *img = icon_image(app_manager_get(i)->icon);
             if (img) {   // готовая круглая иконка (assets/icons): кружок и глиф уже внутри картинки
