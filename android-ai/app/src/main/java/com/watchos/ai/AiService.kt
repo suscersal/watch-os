@@ -173,9 +173,24 @@ class AiService : Service() {
 
     // ---------- OpenRouter ----------
 
-    private class ApiError(val code: Int, msg: String) : Exception(msg)
+    private class ApiError(val code: Int, msg: String, val retry: Boolean = false) : Exception(msg)
 
+    /** Бесплатные модели иногда отвечают пустотой или падают на стороне провайдера: пробуем ещё раз (до 3 попыток, ~35 с). */
     private fun ask(q: String): String {
+        val t0 = System.currentTimeMillis()
+        var attempt = 1
+        while (true) {
+            try {
+                return askOnce(q)
+            } catch (e: ApiError) {
+                if (!e.retry || attempt >= 3 || System.currentTimeMillis() - t0 > 35000) throw e
+                attempt++
+                Thread.sleep(700)
+            }
+        }
+    }
+
+    private fun askOnce(q: String): String {
         val prefs = getSharedPreferences("ai", MODE_PRIVATE)
         val key = prefs.getString("key", "")?.trim().orEmpty()
         val model = prefs.getString("model", DEFAULT_MODEL)?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_MODEL
@@ -206,11 +221,17 @@ class AiService : Service() {
                     ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
                 if (code !in 200..299) {
                     val msg = try { JSONObject(text).getJSONObject("error").getString("message") } catch (_: Exception) { text.take(80) }
-                    throw ApiError(502, if (code == 429) "Rate limit (free models: 50/day). Wait or change model" else "OpenRouter $code: ${msg.take(70)}")
+                    throw ApiError(502, if (code == 429) "Rate limit (free models: 50/day). Wait or change model" else "OpenRouter $code: ${msg.take(70)}", retry = code in 500..599)
                 }
-                val msg = JSONObject(text).getJSONArray("choices").getJSONObject(0).getJSONObject("message")
+                val root = JSONObject(text)
+                val choices = root.optJSONArray("choices")
+                if (choices == null || choices.length() == 0) {      // 200, но внутри ошибка провайдера
+                    val em = root.optJSONObject("error")?.optString("message").orEmpty()
+                    throw ApiError(502, "Provider error: ${em.take(60).ifEmpty { "no answer" }}", retry = true)
+                }
+                val msg = choices.getJSONObject(0).getJSONObject("message")
                 val content = if (msg.isNull("content")) "" else msg.getString("content").trim()
-                if (content.isEmpty()) throw ApiError(502, "Empty answer, try another model")
+                if (content.isEmpty()) throw ApiError(502, "Empty answer, try another model", retry = true)
                 return content
             } finally {
                 c.disconnect()
