@@ -32,8 +32,10 @@ class MainActivity : Activity() {
     private lateinit var progress: ProgressBar
     private lateinit var pickBtn: Button
     private lateinit var timeBtn: Button
+    private lateinit var audioBtn: Button
     private val worker = Executors.newSingleThreadExecutor()
     private val REQ_PICK = 1
+    private val REQ_AUDIO = 2
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +69,9 @@ class MainActivity : Activity() {
 
         pickBtn = Button(this).apply { text = "Choose photos and send"; setOnClickListener { pick() } }
         timeBtn = Button(this).apply { text = "Sync time only"; setOnClickListener { run(emptyList()) } }
+        audioBtn = Button(this).apply { text = "Choose music and send"; setOnClickListener { pickAudio() } }
         root.addView(pickBtn)
+        root.addView(audioBtn)
         root.addView(timeBtn)
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100; visibility = View.INVISIBLE }
@@ -159,14 +163,23 @@ class MainActivity : Activity() {
         startActivityForResult(Intent.createChooser(i, "Choose photos"), REQ_PICK)
     }
 
+    private fun pickAudio() {
+        val i = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "audio/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        startActivityForResult(Intent.createChooser(i, "Choose music"), REQ_AUDIO)
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQ_PICK || resultCode != RESULT_OK || data == null) return
+        if ((requestCode != REQ_PICK && requestCode != REQ_AUDIO) || resultCode != RESULT_OK || data == null) return
         val uris = ArrayList<Uri>()
         data.clipData?.let { c -> for (k in 0 until c.itemCount) uris.add(c.getItemAt(k).uri) }
         if (uris.isEmpty()) data.data?.let { uris.add(it) }
-        if (uris.isNotEmpty()) run(uris)
+        if (uris.isNotEmpty()) run(uris, requestCode == REQ_AUDIO)
     }
 
     private fun say(t: String) = runOnUiThread { status.text = t }
@@ -174,11 +187,12 @@ class MainActivity : Activity() {
     private fun busy(b: Boolean) = runOnUiThread {
         pickBtn.isEnabled = !b
         timeBtn.isEnabled = !b
+        audioBtn.isEnabled = !b
         progress.visibility = if (b) View.VISIBLE else View.INVISIBLE
         if (!b) progress.progress = 0
     }
 
-    private fun run(uris: List<Uri>) {
+    private fun run(uris: List<Uri>, audio: Boolean = false) {
         var host = hostEdit.text.toString().trim()
         var port = portEdit.text.toString().trim().toIntOrNull() ?: 8765
         if (host.contains(":")) {                     // можно ввести сразу "192.168.0.5:8765"
@@ -192,7 +206,19 @@ class MainActivity : Activity() {
         busy(true)
         worker.execute {
             var step = "connect"                       // на каком шаге оборвалось: видно в тексте ошибки
+            val tracks = ArrayList<AudioPrep.Result>()
             try {
+                if (audio) {                           // раскодируем до подключения: долгий трек не должен держать молчащее соединение
+                    step = "convert"
+                    uris.forEachIndexed { index, uri ->
+                        say("Converting track ${index + 1} of ${uris.size} ...")
+                        tracks.add(AudioPrep.prepare(this, uri) { p ->
+                            runOnUiThread { progress.progress = ((index + p / 100f) * 100 / uris.size).toInt() }
+                        })
+                    }
+                    runOnUiThread { progress.progress = 0 }
+                    step = "connect"
+                }
                 WatchClient(host, port).use { w ->
                     say("Connecting to $host:$port ...")
                     w.connect()
@@ -204,6 +230,20 @@ class MainActivity : Activity() {
                     w.setTime(now / 1000, TimeZone.getDefault().getOffset(now) / 60000)
 
                     if (uris.isEmpty()) { say("Time synced."); return@use }
+                    if (audio) {
+                        var sentA = 0
+                        var skippedA = 0
+                        tracks.forEachIndexed { index, t ->
+                            say("Track ${index + 1} of ${tracks.size}: ${t.name}")
+                            step = "track ${index + 1}"
+                            val ok = w.sendAudio(t.name, t.file.length(), t.crc, t.cover, { t.file.inputStream() }) { done, total ->
+                                runOnUiThread { progress.progress = ((index + done.toFloat() / total) * 100 / tracks.size).toInt() }
+                            }
+                            if (ok) sentA++ else skippedA++
+                        }
+                        say("Done: $sentA sent, $skippedA already on the watch.")
+                        return@use
+                    }
                     step = "list"
                     val have = w.listPhotos()
                     var sent = 0
@@ -226,6 +266,7 @@ class MainActivity : Activity() {
                 val hint = if (e is java.io.EOFException) " (the watch closed the connection: reopen Sync on the watch and enter the new code)" else ""
                 say("Error at $step: $what$hint")
             } finally {
+                tracks.forEach { it.file.delete() }
                 busy(false)
             }
         }

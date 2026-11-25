@@ -27,6 +27,11 @@ object Proto {
     const val T_PHOTO_END = 0x12
     const val T_PHOTO_LIST = 0x13
     const val T_PHOTO_DELETE = 0x14
+    const val T_AUDIO_BEGIN = 0x30
+    const val T_AUDIO_DATA = 0x31
+    const val T_AUDIO_END = 0x32
+    const val T_AUDIO_COVER = 0x33
+    const val AUDIO_MAX_BYTES = 24L * 1024 * 1024
     const val T_MESSAGE = 0x20
     const val T_BYE = 0x7F
     const val MSG_APP_MAX = 32
@@ -177,6 +182,40 @@ class WatchClient(private val host: String, private val port: Int) : Closeable {
             onProgress(sent, data.size)
         }
         send(Proto.T_PHOTO_END)
+        reply()
+        return true
+    }
+
+    /**
+     * Трек (WAV PCM 16 бит, уже подготовленный AudioPrep): AUDIO_BEGIN, необязательная обложка (JPEG JFIF до 160x160),
+     * затем данные кусками из потока. true - передан, false - такой файл уже есть на часах.
+     */
+    fun sendAudio(
+        name: String, size: Long, crc: Long, cover: ByteArray?, open: () -> java.io.InputStream,
+        onProgress: (Long, Long) -> Unit = { _, _ -> }
+    ): Boolean {
+        val n = utf8Cut(name, 80)
+        val begin = ByteBuffer.allocate(13 + n.size).order(ByteOrder.LITTLE_ENDIAN)
+        begin.putInt(crc.toInt()).putInt(size.toInt()).putInt(crc.toInt()).put(n.size.toByte()).put(n)
+        send(Proto.T_AUDIO_BEGIN, begin.array())
+        val (_, ok) = reply()
+        if (ok.size >= 2 && ok[1].toInt() == 1) return false
+        if (cover != null) {
+            send(Proto.T_AUDIO_COVER, cover)
+            reply()
+        }
+        open().use { ins ->
+            val buf = ByteArray(Proto.CHUNK)
+            var sent = 0L
+            while (true) {
+                val r = ins.read(buf)
+                if (r <= 0) break
+                send(Proto.T_AUDIO_DATA, if (r == buf.size) buf else buf.copyOf(r))
+                sent += r
+                onProgress(sent, size)
+            }
+        }
+        send(Proto.T_AUDIO_END)
         reply()
         return true
     }
