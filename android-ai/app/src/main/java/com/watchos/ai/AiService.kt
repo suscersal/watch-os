@@ -39,9 +39,9 @@ class AiService : Service() {
         private const val CHANNEL = "ai_bridge"
         const val DEFAULT_SYSTEM = "You answer on a tiny smartwatch screen (about 20 characters per line). " +
             "Reply in the language of the question. Be brief: at most 300 characters. " +
-            "Plain text only: no markdown, no LaTeX, no \$ signs, no tables. " +
-            "Write math with Unicode symbols: √(x), x², x³, aₙ, π, ≤ ≥ ≠ ≈ ∞ ± × ÷ ∑; fractions as a/b; " +
-            "one calculation step per line. " +
+            "No markdown (no **, #, tables). Write all math in LaTeX: inline \\( ... \\) or \$...\$, " +
+            "using \\frac{a}{b}, \\sqrt{x}, \\sqrt[3]{x}, x^{2}, a_{n}, \\pi, \\leq, \\geq, \\neq, \\approx, \\infty, " +
+            "\\pm, \\times, \\cdot, \\sum, \\int, Greek letters. Keep formulas short; one calculation step per line. " +
             "You cannot draw. For charts, graphs or tables give the data as up to 8 lines 'label: value' " +
             "(numbers only after the colon) and then one short sentence."
         private const val MAX_ANSWER_BYTES = 480   // часы хранят ответ в 512 байтах (VAR_VAL)
