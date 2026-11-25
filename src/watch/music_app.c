@@ -50,7 +50,11 @@ static void add_cb(const char *name, void *ud)
     wav_info_t w;
     if (!audio_wav_info(t->path, &w)) return;
     t->dur_ms = w.duration_ms;
-    snprintf(t->cover, sizeof t->cover, "%.*s.jpg", (int)(strlen(t->path) - 4), t->path);
+    {   // <путь без .wav>.jpg; memcpy, а не snprintf: источник и приёмник в одной структуре (-Werror=restrict)
+        size_t pl = strlen(t->path) - 4;
+        if (pl + 5 <= sizeof t->cover) { memcpy(t->cover, t->path, pl); memcpy(t->cover + pl, ".jpg", 5); }
+        else t->cover[0] = '\0';
+    }
     if (fs_file_size(t->cover) <= 0) t->cover[0] = '\0';
     char base[96];
     snprintf(base, sizeof base, "%.*s", (int)(n - 4), name);

@@ -214,7 +214,11 @@ static void on_audio_begin(void)
     snprintf(S.a_path, sizeof S.a_path, "%s/%s", music_dir(), name);
     if (fs_file_size(S.a_path) >= 0) { send_ok(SYNC_T_AUDIO_BEGIN, SYNC_S_HAVE); return; }   // уже есть
     fs_mkdir(music_dir());
-    snprintf(S.a_cover, sizeof S.a_cover, "%.*s.jpg", (int)(strlen(S.a_path) - 4), S.a_path);
+    {
+        size_t pl = strlen(S.a_path) - 4;                   // путь заканчивается на .wav
+        memcpy(S.a_cover, S.a_path, pl);
+        memcpy(S.a_cover + pl, ".jpg", 5);
+    }
     fs_remove(S.a_cover);                                   // обложка от прежнего файла с таким именем
     S.audio_active = true;
     S.a_size = size; S.a_crc = crc; S.a_recv = 0; S.a_run = 0;
