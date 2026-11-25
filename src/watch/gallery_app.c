@@ -8,6 +8,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Декодер изображений LVGL: структуры лежат в приватном заголовке, в lvgl.h их нет, а путь к ним различается у ПК и ESP-IDF.
+#if __has_include("src/draw/lv_image_decoder_private.h")
+#include "src/draw/lv_image_decoder_private.h"
+#elif __has_include("draw/lv_image_decoder_private.h")
+#include "draw/lv_image_decoder_private.h"
+#else
+#include "lvgl/src/draw/lv_image_decoder_private.h"
+#endif
+
 #define GRID_MAX   60      // миниатюр в сетке
 #define THUMB_CELL 118     // 3 в ряд: 3*118 + 2*8 = 370 = 410 - 2*20 (при 120 влезало только 2)
 
@@ -29,23 +38,70 @@ static bool      grid_dirty;                   // список фото изме
 static void build_grid(void);
 
 // ---------- буферы изображений ----------
-// Декодер получает JPEG прямо из памяти; кэш LVGL ключуется адресом dsc, поэтому перед free() запись надо сбросить.
+// Кэш LVGL ключуется адресом dsc, поэтому перед free() запись надо сбросить.
+// Декодер TJpgDec в LVGL разбирает JPEG кусками и при каждой перерисовке полосы экрана читает файл с начала: полный
+// кадр рисовался ~23 с, полоса за полосой. Поэтому раскодируем JPEG один раз сами в RGB565, а LVGL отдаём готовые пиксели.
+static uint16_t *jpeg_to_rgb565(const lv_image_dsc_t *jpg, int w, int h)
+{
+    uint16_t *pix = malloc((size_t)w * h * 2);
+    if (!pix) return NULL;
+    lv_image_decoder_dsc_t dd;
+    memset(&dd, 0, sizeof dd);
+    lv_image_decoder_args_t args;
+    memset(&args, 0, sizeof args);
+    args.no_cache = true;
+    if (lv_image_decoder_open(&dd, jpg, &args) != LV_RESULT_OK) { free(pix); return NULL; }
+
+    lv_area_t full = { 0, 0, w - 1, h - 1 };
+    lv_area_t a = { LV_COORD_MIN, LV_COORD_MIN, LV_COORD_MIN, LV_COORD_MIN };
+    bool ok = false;
+    while (lv_image_decoder_get_area(&dd, &full, &a) == LV_RESULT_OK) {
+        const uint8_t *src = dd.decoded ? dd.decoded->data : NULL;      // блок MCU, пиксели B,G,R подряд
+        if (!src || a.x1 < 0 || a.y1 < 0 || a.x1 >= w || a.y1 >= h) break;
+        int aw = a.x2 - a.x1 + 1, ah = a.y2 - a.y1 + 1;
+        for (int y = 0; y < ah; y++) {
+            uint16_t *row = pix + (size_t)(a.y1 + y) * w + a.x1;
+            for (int x = 0; x < aw; x++, src += 3)
+                row[x] = (uint16_t)(((src[2] & 0xF8) << 8) | ((src[1] & 0xFC) << 3) | (src[0] >> 3));
+        }
+        if (a.x2 >= w - 1 && a.y2 >= h - 1) { ok = true; break; }
+    }
+    lv_image_decoder_close(&dd);
+    if (!ok) { free(pix); return NULL; }
+    return pix;
+}
+
 static imgbuf_t *imgbuf_load(uint32_t id, bool thumb)
 {
     size_t len = 0;
     uint8_t *d = photos_load(id, thumb, &len);
     if (!d) return NULL;
-    imgbuf_t *b = calloc(1, sizeof *b);
-    if (!b) { free(d); return NULL; }
-    b->data = d;
-    b->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-    b->dsc.header.cf = LV_COLOR_FORMAT_RAW;
     int w = 0, h = 0;
-    if (!photos_check_jpeg(d, len, 4096, 4096, &w, &h)) { free(d); free(b); return NULL; }
-    b->dsc.header.w = (uint32_t)w;       // для JPEG из памяти декодер берёт размеры из заголовка dsc
+    if (!photos_check_jpeg(d, len, 4096, 4096, &w, &h)) { free(d); return NULL; }
+
+    lv_image_dsc_t jpg;                  // временный дескриптор JPEG в памяти (нужен декодеру только на время раскодирования)
+    memset(&jpg, 0, sizeof jpg);
+    jpg.header.magic = LV_IMAGE_HEADER_MAGIC;
+    jpg.header.cf = LV_COLOR_FORMAT_RAW;
+    jpg.header.w = (uint32_t)w;          // для JPEG из памяти декодер берёт размеры из заголовка dsc
+    jpg.header.h = (uint32_t)h;
+    jpg.data = d;
+    jpg.data_size = (uint32_t)len;
+    uint16_t *pix = jpeg_to_rgb565(&jpg, w, h);
+    lv_image_cache_drop(&jpg);
+    free(d);
+    if (!pix) return NULL;
+
+    imgbuf_t *b = calloc(1, sizeof *b);
+    if (!b) { free(pix); return NULL; }
+    b->data = (uint8_t *)pix;
+    b->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    b->dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    b->dsc.header.w = (uint32_t)w;
     b->dsc.header.h = (uint32_t)h;
-    b->dsc.data = d;
-    b->dsc.data_size = (uint32_t)len;
+    b->dsc.header.stride = (uint32_t)w * 2;
+    b->dsc.data = b->data;
+    b->dsc.data_size = (uint32_t)((size_t)w * h * 2);
     return b;
 }
 
