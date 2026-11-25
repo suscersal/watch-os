@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -25,7 +26,7 @@ import java.util.concurrent.Executors
 
 /**
  * Мост ИИ для часов (docs/ai-bridge.md): на 127.0.0.1:8788 (только loopback) принимает POST /ask {"q":"..."}; часы доходят сюда через Watch Sync (порт 8787, вне VPN)
- * и отвечает обычным текстом. Сам идёт в OpenRouter; ключ хранится только в настройках этого приложения.
+ * и отвечает обычным текстом. Сам идёт к выбранному провайдеру (OpenRouter, OpenAI, Groq, ...); ключи хранятся только в настройках этого приложения.
  * Для часов: 200 + текст ответа, иначе 4xx/5xx + текст ошибки.
  */
 class AiService : Service() {
@@ -37,6 +38,28 @@ class AiService : Service() {
     companion object {
         const val PORT = 8788       // только loopback: приложение под VPN, ответы в раздачу из него не доходят
         const val DEFAULT_MODEL = "openai/gpt-4o-mini"
+
+        /** Провайдер с OpenAI-совместимым API (POST {base}/chat/completions, GET {base}/models). */
+        class Provider(val id: String, val name: String, val base: String, val keyHint: String, val defaultModel: String)
+
+        val PROVIDERS = listOf(
+            Provider("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", "sk-or-...", DEFAULT_MODEL),
+            Provider("openai", "OpenAI", "https://api.openai.com/v1", "sk-...", "gpt-4o-mini"),
+            Provider("groq", "Groq", "https://api.groq.com/openai/v1", "gsk_...", "llama-3.3-70b-versatile"),
+            Provider("gemini", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "AIza...", "gemini-2.0-flash"),
+            Provider("deepseek", "DeepSeek", "https://api.deepseek.com/v1", "sk-...", "deepseek-chat"),
+        )
+
+        fun provider(id: String?): Provider = PROVIDERS.firstOrNull { it.id == id } ?: PROVIDERS[0]
+
+        /** Ключ и модель хранятся отдельно для каждого провайдера: "key_<id>", "model_<id>". Смена провайдера их не стирает. */
+        fun migrate(p: SharedPreferences) {
+            if (p.contains("provider")) return
+            val e = p.edit().putString("provider", "openrouter")
+            p.getString("key", null)?.let { e.putString("key_openrouter", it) }      // старый единственный ключ был от OpenRouter
+            p.getString("model", null)?.let { e.putString("model_openrouter", it) }
+            e.apply()
+        }
         private const val CHANNEL = "ai_bridge"
         const val DEFAULT_SYSTEM = "You answer on a tiny smartwatch screen (about 20 characters per line). " +
             "Reply in the language of the question. Be brief: at most 300 characters. " +
@@ -188,7 +211,7 @@ class AiService : Service() {
         out.flush()
     }
 
-    // ---------- OpenRouter ----------
+    // ---------- Провайдер ИИ (OpenAI-совместимый API) ----------
 
     private class ApiError(val code: Int, msg: String, val retry: Boolean = false) : Exception(msg)
 
@@ -209,8 +232,10 @@ class AiService : Service() {
 
     private fun askOnce(q: String, img: String?, table: Boolean): String {
         val prefs = getSharedPreferences("ai", MODE_PRIVATE)
-        val key = prefs.getString("key", "")?.trim().orEmpty()
-        val model = prefs.getString("model", DEFAULT_MODEL)?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_MODEL
+        migrate(prefs)
+        val prov = provider(prefs.getString("provider", null))
+        val key = prefs.getString("key_${prov.id}", "")?.trim().orEmpty()
+        val model = prefs.getString("model_${prov.id}", null)?.trim().takeUnless { it.isNullOrEmpty() } ?: prov.defaultModel
         val system = when {
             img != null -> IMAGE_SYSTEM
             table -> TABLE_SYSTEM
@@ -219,7 +244,7 @@ class AiService : Service() {
         val userContent: Any = if (img == null) q else JSONArray()
             .put(JSONObject().put("type", "text").put("text", q))
             .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:image/jpeg;base64,$img")))
-        if (key.isEmpty()) throw ApiError(503, "No API key in Watch AI app")
+        if (key.isEmpty()) throw ApiError(503, "No ${prov.name} API key in Watch AI app")
 
         val body = JSONObject()
             .put("model", model)
@@ -230,7 +255,7 @@ class AiService : Service() {
             .toString()
 
         synchronized(apiLock) {
-            val c = URL("https://openrouter.ai/api/v1/chat/completions").openConnection() as HttpURLConnection
+            val c = URL(prov.base + "/chat/completions").openConnection() as HttpURLConnection
             try {
                 c.requestMethod = "POST"
                 c.connectTimeout = 10000
@@ -238,14 +263,14 @@ class AiService : Service() {
                 c.doOutput = true
                 c.setRequestProperty("Authorization", "Bearer $key")
                 c.setRequestProperty("Content-Type", "application/json")
-                c.setRequestProperty("X-Title", "watch-os")
+                if (prov.id == "openrouter") c.setRequestProperty("X-Title", "watch-os")
                 c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 val code = c.responseCode
                 val text = (if (code in 200..299) c.inputStream else c.errorStream)
                     ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
                 if (code !in 200..299) {
                     val msg = try { JSONObject(text).getJSONObject("error").getString("message") } catch (_: Exception) { text.take(80) }
-                    throw ApiError(502, if (code == 429) "Rate limit (free models: 50/day). Wait or change model" else "OpenRouter $code: ${msg.take(70)}", retry = code in 500..599)
+                    throw ApiError(502, if (code == 429) "Rate limit (${prov.name}). Wait or change model" else "${prov.name} $code: ${msg.take(70)}", retry = code in 500..599)
                 }
                 val root = JSONObject(text)
                 val choices = root.optJSONArray("choices")
