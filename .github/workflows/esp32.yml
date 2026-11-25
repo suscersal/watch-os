@@ -44,7 +44,7 @@ jobs:
           path: esp32
           # В образе espressif/idf:v5.5 старый менеджер компонентов: на первом проходе он падает с
           # MissingKconfigError (LV_USE_FREETYPE), потому что Kconfig LVGL ещё не скачан. В новых 2.x это обработано.
-          command: pip install -U "idf-component-manager>=2.4,<3" && idf.py build && idf.py merge-bin -o watch-os-full.bin && sh decode_bt.sh
+          command: export IDF_CCACHE_ENABLE=1 CCACHE_DIR="$(cd .. && pwd)/.ccache" CCACHE_BASEDIR="$(cd .. && pwd)" CCACHE_COMPILERCHECK=content CCACHE_MAXSIZE=500M && mkdir -p "$CCACHE_DIR" && (command -v ccache && ccache -z || echo "!!! ccache NOT FOUND") && pip install -U "idf-component-manager>=2.4,<3" && idf.py build && ccache -s && idf.py merge-bin -o watch-os-full.bin && sh decode_bt.sh
 
       # Артефакты не нужны: сборка сразу становится релизом.
       # Тег v* (git tag v0.1.0 && git push --tags) - обычный релиз; любая другая сборка ветки main - пред-релиз build-<коммит>.
