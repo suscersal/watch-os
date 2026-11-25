@@ -122,3 +122,9 @@ lvgl/                 submodule
 
 `src/hal/` и `src/mouse_cursor_icon.c` взяты из lv_port_pc_vscode (MIT), текст в `LICENSE-lv_port_pc_vscode.txt`.
 LVGL — MIT.
+
+## Редактор интерфейса
+
+Онлайн-редактор LVGL: https://suscersal.github.io/watch-os-editor/
+
+Исходники: https://github.com/suscersal/watch-os-editor
