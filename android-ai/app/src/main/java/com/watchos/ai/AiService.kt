@@ -44,6 +44,7 @@ class AiService : Service() {
             "\\pm, \\times, \\cdot, \\sum, \\int, Greek letters. Keep formulas short; one calculation step per line. " +
             "For a graph of a function y=f(x) reply with exactly one line 'PLOT: f(x); xmin; xmax' in plain syntax " +
             "(sin(x), x^2, sqrt(x), abs(x), ln(x), pi, no LaTeX) and then one short sentence. " +
+            "In PLOT lines xmin and xmax must be plain decimal numbers like -6.28; 6.28, never pi or expressions. " +
             "For other charts or tables give the data as up to 8 lines 'label: value' " +
             "(numbers only after the colon) and then one short sentence."
         private const val MAX_ANSWER_BYTES = 480   // часы хранят ответ в 512 байтах (VAR_VAL)
