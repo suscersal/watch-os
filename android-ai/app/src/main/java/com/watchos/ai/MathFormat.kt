@@ -24,6 +24,8 @@ object MathFormat {
 
     private val WORDS = mapOf(
         "pi" to "π", "alpha" to "α", "beta" to "β", "gamma" to "γ", "delta" to "δ", "epsilon" to "ε", "theta" to "θ",
+        "rho" to "ρ", "tau" to "τ", "nu" to "ν", "xi" to "ξ", "eta" to "η", "zeta" to "ζ", "kappa" to "κ", "chi" to "χ",
+        "psi" to "ψ", "iota" to "ι", "upsilon" to "υ", "varepsilon" to "ε", "varphi" to "φ", "vartheta" to "θ", "varrho" to "ρ",
         "lambda" to "λ", "mu" to "μ", "sigma" to "σ", "phi" to "φ", "omega" to "ω", "Delta" to "Δ", "Sigma" to "Σ",
         "Omega" to "Ω", "cdot" to "·", "times" to "×", "div" to "÷", "pm" to "±", "leq" to "≤", "le" to "≤",
         "geq" to "≥", "ge" to "≥", "neq" to "≠", "ne" to "≠", "approx" to "≈", "infty" to "∞", "sum" to "∑",
@@ -53,7 +55,7 @@ object MathFormat {
             .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1").replace(Regex("__(.+?)__"), "$1")
             .replace(Regex("(?m)^#{1,6}\\s*"), "").replace(Regex("(?m)^\\s*[*-]\\s+"), "• ")
         // обёртки формул
-        s = s.replace("\\(", "").replace("\\)", "").replace("\\[", "").replace("\\]", "").replace("$$", "").replace("$", "")
+        s = s.replace(Regex("\\\\[(\\[]\\s*|\\s*\\\\[)\\]]"), "").replace("$$", "").replace("$", "")
         s = s.replace("<=", "≤").replace(">=", "≥").replace("!=", "≠")
 
         val out = StringBuilder()
@@ -120,7 +122,7 @@ object MathFormat {
         }
         // sqrt(x) -> √(x), x^2 уже обработано выше; лишние пробелы и пустые строки
         return out.toString().replace(PLAIN_FRAC) { "$FR_A${it.groupValues[1]}$FR_B${it.groupValues[2]}$FR_C" }
-            .replace(Regex("[ \\t]+\\n"), "\n").replace(Regex("(?m)^[ \\t]+"), "").replace(Regex("\\n{3,}"), "\n\n").trim()
+            .replace(Regex("(?<=\\S) {2,}"), " ").replace(Regex("[ \\t]+\\n"), "\n").replace(Regex("(?m)^[ \\t]+"), "").replace(Regex("\\n{3,}"), "\n\n").trim()
     }
 
     /** Обрезает строку до maxBytes в UTF-8, не разрезая символ, и ставит многоточие. */
