@@ -351,6 +351,7 @@ int main(void)
     unit_tests();
 
     watch_launcher_create();
+    app_manager_scan_more("tests/apps");   // образцы JSON-приложений (Tools, Hello) лежат в tests/apps, в прошивку не попадают
     power_set_settings(0, 0, 70);    // экран не гасим, пока проверяем остальное (гашение проверяет power_flow)
     pump(30);
     lv_obj_t *launcher = lv_screen_active();
@@ -390,7 +391,7 @@ int main(void)
     int clicks = 0;
     for (size_t i = 0; i < napps; i++) {
         const app_info_t *a = app_manager_get(i);
-        if (!a) continue;
+        if (!a || a->is_folder) continue;      // папка - не приложение, у неё нечего запускать
         printf("app %s: ", a->name);
         int app_clicks = 0;
         for (int step = 0; step < 80; step++) {

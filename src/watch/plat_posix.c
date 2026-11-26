@@ -63,6 +63,20 @@ bool plat_battery(int *pct, bool *charging)
     return true;
 }
 
+bool plat_battery_info(plat_batt_info_t *o)
+{
+    int pct; bool chg;
+    if (!plat_battery(&pct, &chg)) return false;
+    o->pct = pct;
+    o->charging = chg && pct < 100;
+    o->vbus = chg;
+    o->full = chg && pct >= 100;
+    const char *mv = getenv("WATCH_BATTERY_MV"), *tc = getenv("WATCH_BATTERY_TEMP");
+    o->mv = (mv && *mv) ? atoi(mv) : 3300 + pct * 9;                     // 0% ~ 3.3 В, 100% ~ 4.2 В
+    o->temp_c10 = (tc && *tc) ? (int)(atof(tc) * 10) : (chg ? 330 : 280);
+    return true;
+}
+
 const char *plat_sd_root(void)
 {
     const char *e = getenv("WATCH_SD");

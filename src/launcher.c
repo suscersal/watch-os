@@ -14,6 +14,7 @@
 #include "watch/music_app.h"
 #include "watch/recorder_app.h"
 #include "watch/auth.h"
+#include "watch/battery_app.h"
 #include "watch/paired.h"
 #include "watch/lock_screen.h"
 #include "watch/photos.h"
@@ -49,6 +50,9 @@
 // По умолчанию эффект ВЫКЛЮЧЕН (на часах он давал низкий FPS при прокрутке). Чтобы включить: -DWATCH_FISHEYE_ON (например, в CMake порта).
 
 static lv_obj_t *launcher;
+static lv_obj_t *g_grid;            // прокручиваемая сетка иконок (дочерний объект launcher)
+static char      g_group[32];       // открытая папка; пусто - главный экран
+static const app_info_t back_tile = { .id = "sys_back", .name = "Назад", .icon = "back", .color = 0x48484A };
 
 // Масштаб и сдвиг каждой иконки зависят от расстояния до центра экрана.
 // Стиль меняем только если значение реально изменилось, иначе каждый кадр прокрутки перерисовывал бы всё зря.
@@ -104,15 +108,31 @@ static void scroll_cb(lv_event_t *e)
 #endif
 }
 
+static void build_grid(void);
+
+// Показать содержимое папки (id) или главный экран (""). Сетку пересоздаём; циферблат и прочие дочерние объекты не трогаем.
+static void open_group(const char *id)
+{
+    snprintf(g_group, sizeof g_group, "%s", id);
+    if (g_grid) { lv_obj_delete(g_grid); g_grid = NULL; }
+    build_grid();
+}
+
+// Циферблат показывается заново (пробуждение, свайп вниз): возвращаемся из папки на главный экран. Зовёт watchface_show до создания циферблата.
+void watch_launcher_home(void)
+{
+    if (g_group[0] && launcher) open_group("");
+}
+
 static void app_cb(lv_event_t *e)
 {
     const app_info_t *a = lv_event_get_user_data(e);
+    if (a == &back_tile) { open_group(""); return; }
+    if (a->is_folder)    { open_group(a->id); return; }
     ws_set_accent(a->color);                 // цвет приложения: заголовок экрана, ползунки, шапка таблиц
     if (a->builtin) a->builtin(launcher);    // системное приложение (Install)
     else            app_runtime_launch(a, launcher);
 }
-
-static void build_grid(void);
 
 void watch_launcher_create(void)
 {
@@ -136,6 +156,7 @@ void watch_launcher_create(void)
     printf("LTRACE 5 ok: storage_init\n");
     power_init(WATCH_ROOT "data");
     printf("LTRACE 6 ok: power_init\n");
+    battery_init();                          // история заряда для экрана «Батарея»
     music_init(WATCH_ROOT "data");           // музыка: data/music/*.wav
     printf("LTRACE 7 ok: music_init\n");
     recorder_init(WATCH_ROOT "data");        // записи: data/rec
@@ -158,12 +179,40 @@ void watch_launcher_create(void)
 void watch_launcher_refresh(void)
 {
     lv_obj_clean(launcher);
+    g_grid = NULL;
     build_grid();
+}
+
+// Плитка папки как на iOS: тёмный круг и до четырёх миниатюр приложений 2x2.
+static void folder_preview(lv_obj_t *btn, const char *id)
+{
+    const app_info_t *kids[4];
+    size_t k = app_manager_in_group(id, kids, 4);
+    for (size_t j = 0; j < k; j++) {
+        lv_obj_t *dot = lv_obj_create(btn);
+        lv_obj_remove_style_all(dot);
+        lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE);            // нажатие проходит на саму плитку
+        lv_obj_remove_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_size(dot, 38, 38);
+        lv_obj_set_pos(dot, 14 + (int)(j % 2) * 46, 14 + (int)(j / 2) * 46);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(dot, lv_color_hex(kids[j]->color), 0);
+        lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+        lv_obj_t *g = lv_label_create(dot);
+        lv_label_set_text(g, app_icon_symbol(kids[j]->icon));
+        lv_obj_set_style_text_color(g, lv_color_white(), 0);
+        lv_obj_set_style_text_font(g, WATCH_FONT_BODY, 0);
+        lv_obj_center(g);
+    }
 }
 
 static void build_grid(void)
 {
-    size_t n = app_manager_count();
+    // что показывать: на главном экране приложения без папки и сами папки, в папке - её содержимое (первой плиткой «Назад»)
+    const app_info_t *vis[APPS_MAX + 1];
+    size_t n = 0;
+    if (g_group[0]) vis[n++] = &back_tile;
+    n += app_manager_in_group(g_group, vis + n, APPS_MAX);
     if (n == 0) {
         lv_obj_t *empty = lv_label_create(launcher);
         lv_label_set_text(empty, "No apps in ./apps");
@@ -173,6 +222,7 @@ static void build_grid(void)
     }
     // прокручиваемый контейнер на весь экран
     lv_obj_t *cont = lv_obj_create(launcher);
+    g_grid = cont;
     lv_obj_set_size(cont, SCR_W, SCR_H);
     lv_obj_set_pos(cont, 0, 0);
     lv_obj_set_style_bg_color(cont, lv_color_black(), 0);
@@ -210,30 +260,38 @@ static void build_grid(void)
             lv_obj_set_size(btn, ICON, ICON);
             lv_obj_set_pos(btn, x0 + c * PITCH_X, y);
             lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
-            lv_obj_set_style_bg_color(btn, lv_color_hex(app_manager_get(i)->color), 0);
+            lv_obj_set_style_bg_color(btn, lv_color_hex(vis[i]->color), 0);
             // мягкий вертикальный градиент + тонкая светлая кромка
-            lv_obj_set_style_bg_grad_color(btn, lv_color_darken(lv_color_hex(app_manager_get(i)->color), 60), 0);
+            lv_obj_set_style_bg_grad_color(btn, lv_color_darken(lv_color_hex(vis[i]->color), 60), 0);
             lv_obj_set_style_bg_grad_dir(btn, LV_GRAD_DIR_VER, 0);
             lv_obj_set_style_border_width(btn, 2, 0);
             lv_obj_set_style_border_color(btn, lv_color_white(), 0);
             lv_obj_set_style_border_opa(btn, LV_OPA_20, 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
-            lv_obj_add_event_cb(btn, app_cb, LV_EVENT_CLICKED, (void *)app_manager_get(i));
+            lv_obj_add_event_cb(btn, app_cb, LV_EVENT_CLICKED, (void *)vis[i]);
 
             // Подпись под иконкой. Это соседний с кнопкой объект, а не её потомок: потомка, вылезающего за границу кнопки,
             // LVGL обрезает (OVERFLOW_VISIBLE растягивает область лишь на ext_draw_size, а у кнопки он 0), и подпись пропадала.
             lv_obj_t *cap = lv_label_create(cont);
             lv_label_set_long_mode(cap, LV_LABEL_LONG_DOT);
             lv_obj_set_width(cap, LABEL_W);
-            lv_label_set_text(cap, app_manager_get(i)->name);
+            lv_label_set_text(cap, vis[i]->name);
             lv_obj_set_style_text_font(cap, WATCH_FONT_SMALL, 0);
             lv_obj_set_style_text_color(cap, lv_color_white(), 0);
             lv_obj_set_style_text_align(cap, LV_TEXT_ALIGN_CENTER, 0);
             lv_obj_set_pos(cap, x0 + c * PITCH_X + (ICON - LABEL_W) / 2, y + ICON + LABEL_GAP);
             lv_obj_add_flag(cap, LV_OBJ_FLAG_CLICKABLE);              // нажатие на подпись открывает приложение, как и на иконку
-            lv_obj_add_event_cb(cap, app_cb, LV_EVENT_CLICKED, (void *)app_manager_get(i));
+            lv_obj_add_event_cb(cap, app_cb, LV_EVENT_CLICKED, (void *)vis[i]);
 
-            const lv_image_dsc_t *img = icon_image(app_manager_get(i)->icon);
+            if (vis[i]->is_folder) {
+                lv_obj_set_style_bg_color(btn, lv_color_hex(0x2C2C2E), 0);
+                lv_obj_set_style_bg_grad_dir(btn, LV_GRAD_DIR_NONE, 0);
+                lv_obj_set_style_pad_all(btn, 0, 0);                    // у кнопки из темы есть отступы, миниатюры позиционируем от угла
+                lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+                folder_preview(btn, vis[i]->id);
+                continue;
+            }
+            const lv_image_dsc_t *img = icon_image(vis[i]->icon);
             if (img) {   // готовая круглая иконка (assets/icons): кружок и глиф уже внутри картинки
                 // убираем стили темы: градиент, кромка и анимация нажатия перерисовывали круг при каждом касании
                 lv_obj_remove_style_all(btn);
@@ -247,7 +305,7 @@ static void build_grid(void)
                 continue;
             }
             lv_obj_t *l = lv_label_create(btn);
-            lv_label_set_text(l, app_icon_symbol(app_manager_get(i)->icon));
+            lv_label_set_text(l, app_icon_symbol(vis[i]->icon));
             lv_obj_set_style_text_color(l, lv_color_white(), 0);
             lv_obj_set_style_text_font(l, WATCH_FONT_LARGE, 0);
             lv_obj_set_style_transform_pivot_x(l, lv_pct(50), 0);   // глиф крупнее, чем шрифт 28: масштаб вокруг центра

@@ -105,6 +105,50 @@ bool plat_battery(int *pct, bool *charging)
     return true;
 }
 
+// Подробности для экрана «Батарея». Регистры AXP2101 (даташит, XPowersLib): 0x00 STATUS1 (бит 3 - батарея есть, бит 5 - VBUS есть),
+// 0x01 STATUS2 (биты 7..5 == 1 - идёт зарядка, биты 2..0 == 4 - зарядка закончена), 0x30 - включение каналов АЦП (бит 0 - напряжение
+// батареи, бит 4 - температура кристалла), 0x34/0x35 - напряжение батареи (14 бит, мВ), 0x3C/0x3D - температура кристалла (14 бит,
+// T = 22 + (7274 - raw) / 20). ПРОВЕРЬТЕ на плате: числа вне разумных пределов отбрасываются (поле станет "неизвестно"), но формулу
+// температуры и включение АЦП в этом окружении проверить было нечем.
+bool plat_battery_info(plat_batt_info_t *o)
+{
+    i2c_master_dev_handle_t d = plat_esp_i2c_dev(0x34, &g_pmu);
+    if (!d) return false;
+    uint8_t reg = 0x00, st[2];
+    if (i2c_master_transmit_receive(d, &reg, 1, st, 2, 50) != ESP_OK || !(st[0] & 0x08)) return false;
+    uint8_t rp = 0xA4, p;
+    if (i2c_master_transmit_receive(d, &rp, 1, &p, 1, 50) != ESP_OK) return false;
+
+    static bool adc_on;
+    if (!adc_on) {                                             // один раз включаем измерение напряжения батареи и температуры
+        uint8_t r30 = 0x30, v;
+        if (i2c_master_transmit_receive(d, &r30, 1, &v, 1, 50) == ESP_OK) {
+            if ((v & 0x11) != 0x11) { uint8_t w[2] = { 0x30, (uint8_t)(v | 0x11) }; i2c_master_transmit(d, w, sizeof w, 50); }
+            adc_on = true;
+        }
+    }
+
+    o->pct = p > 100 ? 100 : p;
+    o->vbus = (st[0] & 0x20) != 0;
+    o->full = o->vbus && ((st[1] & 0x07) == 4 || o->pct >= 100);
+    o->charging = ((st[1] >> 5) == 1) && !o->full;
+
+    o->mv = PLAT_BATT_UNKNOWN;
+    uint8_t rv = 0x34, b[2];
+    if (i2c_master_transmit_receive(d, &rv, 1, b, 2, 50) == ESP_OK) {
+        int mv = ((b[0] & 0x3F) << 8) | b[1];
+        if (mv >= 2500 && mv <= 4700) o->mv = mv;
+    }
+    o->temp_c10 = PLAT_BATT_UNKNOWN;
+    uint8_t rt = 0x3C;
+    if (i2c_master_transmit_receive(d, &rt, 1, b, 2, 50) == ESP_OK) {
+        int raw = ((b[0] & 0x3F) << 8) | b[1];
+        int t10 = 220 + (7274 - raw) / 2;
+        if (t10 >= -200 && t10 <= 1200) o->temp_c10 = t10;
+    }
+    return true;
+}
+
 // ---------- microSD (слот SDMMC, 1 линия данных; монтирует BSP) ----------
 // Контакта обнаружения карты у платы нет, поэтому фоновая задача раз в SD_POLL_MS пробует смонтировать карту,
 // а пока она смонтирована - проверяет, что она отвечает (sdmmc_get_status). Нечитаемую карту не форматируем.

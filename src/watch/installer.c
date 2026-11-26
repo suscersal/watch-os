@@ -240,7 +240,7 @@ static void rebuild_list(void)
     lv_obj_clean(list_box);
     for (size_t i = 0; i < app_manager_count(); i++) {
         const app_info_t *a = app_manager_get(i);
-        if (a->builtin) continue;
+        if (a->builtin || a->is_folder) continue;
         lv_obj_t *row = lv_obj_create(list_box);
         lv_obj_remove_style_all(row);
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);

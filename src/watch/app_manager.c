@@ -5,6 +5,7 @@
 #include "display_app.h"
 #include "buttons_test_app.h"
 #include "gyro_app.h"
+#include "battery_app.h"
 #include "music_app.h"
 #include "recorder_app.h"
 #include "timer_app.h"
@@ -35,7 +36,7 @@ static const struct { const char *key; const char *sym; } icon_tbl[] = {
     {"home", LV_SYMBOL_HOME},     {"file", LV_SYMBOL_FILE},   {"folder", LV_SYMBOL_DIRECTORY},
     {"video", LV_SYMBOL_VIDEO},   {"wifi", LV_SYMBOL_WIFI},   {"battery", LV_SYMBOL_BATTERY_FULL},
     {"charge", LV_SYMBOL_CHARGE}, {"refresh", LV_SYMBOL_REFRESH}, {"play", LV_SYMBOL_PLAY},
-    {"trash", LV_SYMBOL_TRASH},   {"download", LV_SYMBOL_DOWNLOAD}, {"eye", LV_SYMBOL_EYE_CLOSE},
+    {"back", LV_SYMBOL_LEFT},      {"trash", LV_SYMBOL_TRASH},   {"download", LV_SYMBOL_DOWNLOAD}, {"eye", LV_SYMBOL_EYE_CLOSE},
 };
 
 const char *app_icon_symbol(const char *key)
@@ -118,6 +119,59 @@ static int cmp_apps(const void *x, const void *y)
     return strcmp(((const app_info_t *)x)->id, ((const app_info_t *)y)->id);
 }
 
+// ---------- системные приложения и папки ----------
+// Главный экран: Ask, Messages, Gallery, Музыка, папки «Инструменты» и «Система», Батарея. Остальное лежит в папках.
+// Порядок регистрации = порядок на экране (внутри папки тоже). Приложения, которые уже не нужны (тесты кнопок и гироскопа),
+// в сетку не попадают; вернуть: собрать с -DWATCH_DIAG_APPS, они появятся в папке «Система».
+#define GRP_TOOLS  "grp_tools"
+#define GRP_SYSTEM "grp_system"
+
+static void reg_app(const char *id, const char *name, const char *icon, uint32_t color, const char *group,
+                    void (*open)(lv_obj_t *launcher))
+{
+    if (napps >= APPS_MAX) return;
+    app_info_t *a = &apps[napps++];
+    memset(a, 0, sizeof *a);
+    snprintf(a->id, sizeof a->id, "%s", id);
+    snprintf(a->name, sizeof a->name, "%s", name);
+    snprintf(a->icon, sizeof a->icon, "%s", icon);
+    a->color = color;
+    if (group) snprintf(a->group, sizeof a->group, "%s", group);
+    a->builtin = open;
+}
+
+static void reg_folder(const char *id, const char *name, uint32_t color)
+{
+    reg_app(id, name, "folder", color, NULL, NULL);
+    if (napps && strcmp(apps[napps - 1].id, id) == 0) apps[napps - 1].is_folder = true;
+}
+
+static void register_system_apps(void)
+{
+    reg_app("sys_messages", "Messages",    "mail",    0x22C55E, NULL, messages_open);
+    reg_app("sys_gallery",  "Gallery",     "image",   0xF97316, NULL, gallery_open);
+    reg_app("sys_music",    "Музыка",      "audio",   0xFF4D6D, NULL, music_open);
+
+    reg_folder(GRP_TOOLS, "Инструменты", 0xFF9F0A);
+    reg_app("sys_timer",    "Таймер",      "timer",   0xFF8800, GRP_TOOLS, timer_open);
+    reg_app("sys_calc",     "Калькулятор", "calc",    0xFF9F0A, GRP_TOOLS, calc_open);
+    reg_app("sys_recorder", "Диктофон",    "mic",     0xFF3B30, GRP_TOOLS, recorder_open);
+
+    reg_app("sys_battery",  "Батарея",     "battery", 0x30D158, NULL, battery_open);
+
+    reg_folder(GRP_SYSTEM, "Система", 0x6B7280);
+    reg_app("sys_settings", "Settings",    "settings", 0x3B82F6, GRP_SYSTEM, settings_open);
+    reg_app("sys_display",  "Display",     "video",   0xD946EF, GRP_SYSTEM, display_open);
+    reg_app("sys_sync",     "Sync",        "refresh", 0x14B8A6, GRP_SYSTEM, sync_app_open);
+    reg_app("sys_files",    "Files",       "folder",  0xFACC15, GRP_SYSTEM, files_open);
+    reg_app("sys_security", "Security",    "eye",     0x6B7280, GRP_SYSTEM, security_open);
+    reg_app("sys_install",  "Install",     "download", 0x0EA5E9, GRP_SYSTEM, installer_open);
+#ifdef WATCH_DIAG_APPS
+    reg_app("sys_buttons",  "Кнопки",      "ok",      0x8B5CF6, GRP_SYSTEM, buttons_test_open);
+    reg_app("sys_gyro",     "Гироскоп",    "refresh", 0x06B6D4, GRP_SYSTEM, gyro_test_open);
+#endif
+}
+
 size_t app_manager_scan(const char *root)
 {
     napps = 0;
@@ -125,134 +179,15 @@ size_t app_manager_scan(const char *root)
     fs_list_dir(g_root, dir_cb, g_root);
     qsort(apps, napps, sizeof apps[0], cmp_apps);
 
-    // системные приложения всегда в конце
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_install");
-        snprintf(a->name, sizeof a->name, "Install");
-        snprintf(a->icon, sizeof a->icon, "download");
-        a->color = 0x0EA5E9;
-        a->builtin = installer_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_music");
-        snprintf(a->name, sizeof a->name, "Музыка");
-        snprintf(a->icon, sizeof a->icon, "audio");
-        a->color = 0xFF4D6D;
-        a->builtin = music_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_timer");
-        snprintf(a->name, sizeof a->name, "Таймер");
-        snprintf(a->icon, sizeof a->icon, "timer");
-        a->color = 0xFF8800;
-        a->builtin = timer_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_calc");
-        snprintf(a->name, sizeof a->name, "Калькулятор");
-        snprintf(a->icon, sizeof a->icon, "calc");
-        a->color = 0xFF9F0A;
-        a->builtin = calc_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_recorder");
-        snprintf(a->name, sizeof a->name, "Диктофон");
-        snprintf(a->icon, sizeof a->icon, "mic");
-        a->color = 0xFF3B30;
-        a->builtin = recorder_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_display");
-        snprintf(a->name, sizeof a->name, "Display");
-        snprintf(a->icon, sizeof a->icon, "video");
-        a->color = 0xD946EF;
-        a->builtin = display_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_gallery");
-        snprintf(a->name, sizeof a->name, "Gallery");
-        snprintf(a->icon, sizeof a->icon, "image");
-        a->color = 0xF97316;
-        a->builtin = gallery_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_files");
-        snprintf(a->name, sizeof a->name, "Files");
-        snprintf(a->icon, sizeof a->icon, "folder");
-        a->color = 0xFACC15;
-        a->builtin = files_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_sync");
-        snprintf(a->name, sizeof a->name, "Sync");
-        snprintf(a->icon, sizeof a->icon, "refresh");
-        a->color = 0x14B8A6;
-        a->builtin = sync_app_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_messages");
-        snprintf(a->name, sizeof a->name, "Messages");
-        snprintf(a->icon, sizeof a->icon, "mail");
-        a->color = 0x22C55E;
-        a->builtin = messages_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_settings");
-        snprintf(a->name, sizeof a->name, "Settings");
-        snprintf(a->icon, sizeof a->icon, "settings");
-        a->color = 0x3B82F6;
-        a->builtin = settings_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_buttons");
-        snprintf(a->name, sizeof a->name, "Кнопки");
-        snprintf(a->icon, sizeof a->icon, "ok");
-        a->color = 0x8B5CF6;
-        a->builtin = buttons_test_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_gyro");
-        snprintf(a->name, sizeof a->name, "Гироскоп");
-        snprintf(a->icon, sizeof a->icon, "refresh");
-        a->color = 0x06B6D4;
-        a->builtin = gyro_test_open;
-    }
-    if (napps < APPS_MAX) {
-        app_info_t *a = &apps[napps++];
-        memset(a, 0, sizeof *a);
-        snprintf(a->id, sizeof a->id, "sys_security");
-        snprintf(a->name, sizeof a->name, "Security");
-        snprintf(a->icon, sizeof a->icon, "eye");
-        a->color = 0x6B7280;
-        a->builtin = security_open;
-    }
+    register_system_apps();
     return napps;
+}
+
+size_t app_manager_scan_more(const char *root)
+{
+    size_t before = napps;
+    fs_list_dir(root, dir_cb, (void *)root);
+    return napps - before;
 }
 
 const char *app_manager_root(void) { return g_root; }
@@ -260,3 +195,12 @@ const char *app_manager_root(void) { return g_root; }
 size_t app_manager_count(void) { return napps; }
 
 const app_info_t *app_manager_get(size_t i) { return i < napps ? &apps[i] : NULL; }
+
+size_t app_manager_in_group(const char *group, const app_info_t **out, size_t max)
+{
+    size_t n = 0;
+    if (!group) group = "";
+    for (size_t i = 0; i < napps && n < max; i++)
+        if (strcmp(apps[i].group, group) == 0) out[n++] = &apps[i];
+    return n;
+}

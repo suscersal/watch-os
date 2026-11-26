@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+void watch_launcher_home(void);   // launcher.c
 static lv_obj_t   *g_launcher;
 static lv_obj_t   *g_face, *g_time, *g_date, *g_unread, *g_hint;
 static lv_timer_t *g_timer;
@@ -103,6 +104,7 @@ void watchface_show(lv_obj_t *launcher)
         lv_obj_add_event_cb(launcher, launcher_gesture_cb, LV_EVENT_GESTURE, NULL);
     }
     if (g_face) return;
+    watch_launcher_home();                 // из папки возвращаемся на главный экран, пока циферблата ещё нет (иначе сетка ляжет поверх него)
 
     g_face = lv_obj_create(launcher);
     lv_obj_remove_style_all(g_face);
