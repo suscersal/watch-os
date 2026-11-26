@@ -175,7 +175,9 @@ static void build_grid(void)
     lv_obj_t *cont = lv_obj_create(launcher);
     lv_obj_set_size(cont, SCR_W, SCR_H);
     lv_obj_set_pos(cont, 0, 0);
-    lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_color(cont, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, 0);   // непрозрачный фон: LVGL не смешивает слои под иконками
+    lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLL_ELASTIC);   // без отскока: меньше лишних кадров после отпускания
     lv_obj_set_style_border_width(cont, 0, 0);
     lv_obj_set_style_radius(cont, 0, 0);
     lv_obj_set_style_pad_all(cont, 0, 0);
