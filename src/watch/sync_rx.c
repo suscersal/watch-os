@@ -5,6 +5,8 @@
 #include "messages.h"
 #include "audio.h"
 #include "fs.h"
+#include "ota.h"
+#include "plat.h"
 #include "music_app.h"
 #include "paired.h"
 #include "photos.h"
@@ -43,6 +45,10 @@ typedef struct {
     bool     audio_active;
     uint32_t a_size, a_crc, a_recv, a_run;
     char     a_path[160], a_cover[164];
+
+    // обновление прошивки: образ идёт прямо в неактивный OTA-слот
+    bool     fw_active;
+    uint32_t fw_size, fw_crc, fw_recv, fw_run;
 } sess_t;
 
 static sess_t        S;
@@ -92,6 +98,13 @@ static void audio_reset(bool remove_file)
     S.a_recv = 0;
 }
 
+static void fw_reset(void)
+{
+    if (S.fw_active) ota_abort();
+    S.fw_active = false;
+    S.fw_recv = 0;
+}
+
 void sync_rx_open(const char *code, const sync_io_t *io)
 {
     sync_rx_close();
@@ -108,6 +121,7 @@ void sync_rx_close(void)
     if (!S.open) return;
     photo_reset();
     audio_reset(true);
+    fw_reset();                  // оборванное обновление: слот остаётся неактивным, прежняя прошивка цела
     free(S.payload);
     S.payload = NULL;
     S.open = false;
@@ -291,6 +305,40 @@ static void on_audio_end(void)
     emit(SYNC_EV_AUDIO);
 }
 
+// FW_BEGIN: size u32, crc32 u32. Прошивку принимает только сеанс по одноразовому коду (часы в руках у владельца, открыт экран Sync):
+// токен и постоянный код уведомлений для этого не годятся, их можно подсмотреть в сети (трафик не шифруется).
+static void on_fw_begin(void)
+{
+    fw_reset();
+    if (!S.via_code || S.scope != SCOPE_FULL) { send_err(SYNC_T_FW_BEGIN, SYNC_E_SCOPE); return; }
+    if (!ota_available()) { send_err(SYNC_T_FW_BEGIN, SYNC_E_UNSUPPORTED); return; }
+    if (S.len != 8) { send_err(SYNC_T_FW_BEGIN, SYNC_E_BAD_FRAME); return; }
+    uint32_t size = rd32(S.payload), crc = rd32(S.payload + 4);
+    if (size < SYNC_FW_MIN_BYTES) { send_err(SYNC_T_FW_BEGIN, SYNC_E_FORMAT); return; }
+    if (size > SYNC_FW_MAX_BYTES) { send_err(SYNC_T_FW_BEGIN, SYNC_E_TOO_BIG); return; }
+    int pct; bool chg;
+    if (plat_battery(&pct, &chg) && !chg && pct < SYNC_FW_MIN_BATTERY) { send_err(SYNC_T_FW_BEGIN, SYNC_E_LOWBATT); return; }
+    photo_reset();
+    audio_reset(true);
+    if (!ota_begin(size)) { send_err(SYNC_T_FW_BEGIN, SYNC_E_STORAGE); return; }
+    S.fw_active = true;
+    S.fw_size = size; S.fw_crc = crc; S.fw_recv = 0; S.fw_run = 0;
+    send_ok(SYNC_T_FW_BEGIN, SYNC_S_READY);
+}
+
+static void on_fw_end(void)
+{
+    if (!S.fw_active || S.fw_recv != S.fw_size) { fw_reset(); send_err(SYNC_T_FW_END, SYNC_E_STATE); return; }
+    if (S.fw_run != S.fw_crc) { fw_reset(); send_err(SYNC_T_FW_END, SYNC_E_CRC); return; }
+    int e = ota_end();                  // проверка образа и выбор слота; после этого дескриптор приёма закрыт
+    S.fw_active = false;
+    S.fw_recv = 0;
+    if (e != OTA_OK) { send_err(SYNC_T_FW_END, e == OTA_E_FORMAT ? SYNC_E_FORMAT : SYNC_E_STORAGE); return; }
+    send_ok(SYNC_T_FW_END, 0);
+    emit(SYNC_EV_FIRMWARE);
+    ota_restart_soon();
+}
+
 static void on_list(void)
 {
     uint32_t ids[200];
@@ -355,6 +403,8 @@ static bool on_frame(void)
     case SYNC_T_AUDIO_BEGIN:  on_audio_begin(); break;
     case SYNC_T_AUDIO_COVER:  on_audio_cover(); break;
     case SYNC_T_AUDIO_END:    on_audio_end(); break;
+    case SYNC_T_FW_BEGIN:     on_fw_begin(); break;
+    case SYNC_T_FW_END:       on_fw_end(); break;
     case SYNC_T_PHOTO_BEGIN:  on_photo_begin(); break;
     case SYNC_T_PHOTO_END:    on_photo_end(); break;
     case SYNC_T_PHOTO_LIST:   on_list(); break;
@@ -375,12 +425,14 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
             S.len = rd32(S.hdr + 1);
             S.got = 0;
             if (S.len > SYNC_MAX_FRAME) { send_err(S.type, SYNC_E_TOO_BIG); g_why = "frame too big"; return false; }
-            if (S.type != SYNC_T_PHOTO_DATA && S.type != SYNC_T_AUDIO_DATA) {
+            if (S.type != SYNC_T_PHOTO_DATA && S.type != SYNC_T_AUDIO_DATA && S.type != SYNC_T_FW_DATA) {
                 free(S.payload);
                 S.payload = malloc(S.len ? S.len : 1);
                 if (!S.payload) { g_why = "out of memory"; return false; }
             } else if (S.type == SYNC_T_AUDIO_DATA) {
                 if (!S.authed || S.scope != SCOPE_FULL || !S.audio_active) { send_err(S.type, SYNC_E_STATE); g_why = "audio data without BEGIN"; return false; }
+            } else if (S.type == SYNC_T_FW_DATA) {
+                if (!S.authed || S.scope != SCOPE_FULL || !S.via_code || !S.fw_active) { send_err(S.type, SYNC_E_STATE); g_why = "firmware data without BEGIN"; return false; }
             } else if (!S.authed || !S.photo_active) {
                 send_err(S.type, SYNC_E_STATE);
                 g_why = "photo data without BEGIN";
@@ -388,7 +440,7 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
             }
             if (S.len == 0) {                       // пустой кадр: сразу обработать
                 S.hdr_n = 0;
-                if (S.type == SYNC_T_PHOTO_DATA || S.type == SYNC_T_AUDIO_DATA) continue;
+                if (S.type == SYNC_T_PHOTO_DATA || S.type == SYNC_T_AUDIO_DATA || S.type == SYNC_T_FW_DATA) continue;
                 if (!on_frame()) return false;
             }
             continue;
@@ -400,6 +452,12 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
             if (!fs_append_file(S.a_path, d, take)) { send_err(S.type, SYNC_E_STORAGE); audio_reset(true); g_why = "storage write failed"; return false; }
             S.a_run = crc32_update(S.a_run, d, take);
             S.a_recv += (uint32_t)take;
+        } else if (S.type == SYNC_T_FW_DATA) {
+            if (S.fw_recv + take > S.fw_size) { send_err(S.type, SYNC_E_TOO_BIG); fw_reset(); g_why = "firmware data overflow"; return false; }
+            int e = ota_write(d, take);
+            if (e != OTA_OK) { send_err(S.type, e == OTA_E_FORMAT ? SYNC_E_FORMAT : SYNC_E_STORAGE); fw_reset(); g_why = "firmware write failed"; return false; }
+            S.fw_run = crc32_update(S.fw_run, d, take);
+            S.fw_recv += (uint32_t)take;
         } else if (S.type == SYNC_T_PHOTO_DATA) {
             if (S.recv + take > S.thumb_n + S.full_n) { send_err(S.type, SYNC_E_TOO_BIG); photo_reset(); g_why = "photo data overflow"; return false; }
             memcpy(S.buf + S.recv, d, take);
@@ -410,7 +468,7 @@ bool sync_rx_feed(const uint8_t *d, size_t n)
         S.got += (uint32_t)take; d += take; n -= take;
         if (S.got == S.len) {
             S.hdr_n = 0;
-            if (S.type != SYNC_T_PHOTO_DATA && S.type != SYNC_T_AUDIO_DATA && !on_frame()) return false;
+            if (S.type != SYNC_T_PHOTO_DATA && S.type != SYNC_T_AUDIO_DATA && S.type != SYNC_T_FW_DATA && !on_frame()) return false;
         }
     }
     return true;

@@ -25,6 +25,12 @@
 #define SYNC_T_AUDIO_END     0x32
 #define SYNC_T_AUDIO_COVER   0x33     // после AUDIO_BEGIN (ответ READY), до DATA: обложка, baseline JFIF JPEG до 160x160, не больше 20000 байт
 #define SYNC_AUDIO_MAX_BYTES (24u * 1024 * 1024)
+#define SYNC_T_FW_BEGIN      0x40     // обновление прошивки: size u32, crc32 u32 (от всего образа .bin). Только в сеансе по одноразовому коду с экрана Sync
+#define SYNC_T_FW_DATA       0x41     // сырые байты образа, куски до 16384; пишутся сразу в неактивный OTA-слот
+#define SYNC_T_FW_END        0x42     // проверка размера, crc32 и образа; при успехе OK и перезагрузка через ~2 с
+#define SYNC_FW_MAX_BYTES    (4u * 1024 * 1024)   // размер OTA-слота (esp32/partitions.csv)
+#define SYNC_FW_MIN_BYTES    (64u * 1024)
+#define SYNC_FW_MIN_BATTERY  30       // % заряда, ниже которого прошивку не принимают без зарядки
 #define SYNC_T_MESSAGE       0x20     // уведомление: id u32, ts u32, app_len u8, title_len u8, text_len u16, затем app, title, text (utf8)
 #define SYNC_T_BYE           0x7F
 
@@ -45,6 +51,7 @@
 #define SYNC_E_STORAGE       7        // нет места или запись не удалась
 #define SYNC_E_UNSUPPORTED   8
 #define SYNC_E_LOCKED        9        // часы заблокированы PIN-кодом
+#define SYNC_E_LOWBATT       11       // мало заряда для обновления прошивки: поставьте часы на зарядку
 #define SYNC_E_SCOPE         10       // команда не разрешена для этого кода (постоянный код пускает только TIME и MESSAGE)
 
 // статус в SYNC_T_OK для PHOTO_BEGIN

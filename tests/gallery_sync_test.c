@@ -11,6 +11,8 @@
 #include "watch/settings.h"
 #include "watch/lvgl_inc.h"
 #include "watch/photos.h"
+#include "fake_ota.h"
+#include "watch/fs.h"
 #include "watch/sync_app.h"
 #include "watch/sync_net.h"
 #include "watch/sync_proto.h"
@@ -136,6 +138,26 @@ static bool hello(const char *code)
     return tx(SYNC_T_HELLO, p, sizeof p);
 }
 
+// Передача прошивки: FW_BEGIN, FW_DATA кусками, FW_END. Возвращает тип последнего ответа.
+static int send_fw(const uint8_t *d, size_t n, uint32_t claimed_size, bool bad_crc, bool finish)
+{
+    uint8_t b[8];
+    w32(b, claimed_size); w32(b + 4, crc32_update(0, d, n) ^ (bad_crc ? 1u : 0));
+    tx(SYNC_T_FW_BEGIN, b, 8);
+    int r = resp_type();
+    if (r == SYNC_T_OK && resp_code() == SYNC_S_READY) {
+        for (size_t off = 0; off < n; off += 9000) {
+            size_t k = n - off < 9000 ? n - off : 9000;
+            out_n = 0;
+            if (!send_frame(SYNC_T_FW_DATA, d + off, k, 31)) return resp_type();   // часы закрыли соединение: ответ ERR в out
+            if (!finish && off >= 9000) return r;
+        }
+        tx(SYNC_T_FW_END, NULL, 0);
+        r = resp_type();
+    }
+    return r;
+}
+
 // Полная передача фото: BEGIN, DATA кусками, END. Возвращает тип последнего ответа.
 static int send_photo(uint32_t id, uint32_t taken, const uint8_t *th, size_t tn, const uint8_t *fu, size_t fn, uint32_t crc_override, bool use_override)
 {
@@ -230,6 +252,36 @@ int main(int argc, char **argv)
     char fmt[40];
     clock_format_epoch(1700001000, fmt, sizeof fmt);
     CHECK(strcmp(fmt, "2023-11-15 01:30") == 0, "clock_format_epoch uses the synced zone");
+
+    // ---- прошивка по воздуху: только по одноразовому коду, в неактивный слот, с проверками ----
+    {
+        size_t fn = 100000;
+        uint8_t *fw = malloc(fn);
+        for (size_t i = 0; i < fn; i++) fw[i] = (uint8_t)(i * 31 + 7);
+        fw[0] = 0xE9;
+        CHECK(send_fw(fw, fn, (uint32_t)fn, false, true) == SYNC_T_ERR && resp_code() == SYNC_E_UNSUPPORTED, "firmware: no platform (PC) -> unsupported");
+        ota_set_hw(&FAKE_OTA);
+        CHECK(send_fw(fw, fn, (uint32_t)fn, false, true) == SYNC_T_OK && resp_code() == 0, "firmware: image accepted");
+        CHECK(fs_file_size("fw_received.bin") == (long)fn && !exists("fw_received.bin.part"), "firmware: all bytes in the slot, no partial file");
+        CHECK(fo_restarts == 1 && ev_count[SYNC_EV_FIRMWARE] == 1, "firmware: restart requested once, event emitted");
+        CHECK(send_fw(fw, fn, (uint32_t)fn, true, true) == SYNC_T_ERR && resp_code() == SYNC_E_CRC && fo_restarts == 1 && !exists("fw_received.bin.part"), "firmware: bad CRC rejected, no restart, slot dropped");
+        CHECK(send_fw(fw, 1000, 1000, false, true) == SYNC_T_ERR && resp_code() == SYNC_E_FORMAT, "firmware: tiny file rejected (below 64 KB)");
+        CHECK(send_fw(fw, fn, SYNC_FW_MAX_BYTES + 1, false, true) == SYNC_T_ERR && resp_code() == SYNC_E_TOO_BIG, "firmware: bigger than the slot rejected");
+        fo_fail_begin = true;
+        CHECK(send_fw(fw, fn, (uint32_t)fn, false, true) == SYNC_T_ERR && resp_code() == SYNC_E_STORAGE, "firmware: no free slot -> storage error");
+        fo_fail_begin = false;
+        uint8_t *junk = calloc(1, fn);                                   // не образ: первый байт не 0xE9
+        open_session("123456"); CHECK(hello("123456"), "firmware: new session");
+        CHECK(send_fw(junk, fn, (uint32_t)fn, false, true) == SYNC_T_ERR && resp_code() == SYNC_E_FORMAT && fo_restarts == 1, "firmware: not an image rejected on the first block, connection closed");
+        open_session("123456"); CHECK(hello("123456"), "firmware: new session after rejection");
+        int aborts = fo_aborts;
+        send_fw(fw, fn, (uint32_t)fn, false, false);                     // оборвали посередине
+        open_session("123456");                                          // новая сессия: недокачанное бросается
+        CHECK(fo_aborts > aborts && !exists("fw_received.bin.part") && fo_restarts == 1, "firmware: interrupted transfer aborted, no restart");
+        CHECK(hello("123456") && resp_type() == SYNC_T_HELLO_OK, "firmware: session reopened");
+        free(fw); free(junk);
+        ota_set_hw(NULL);
+    }
     uint8_t badt[10] = {0};
     CHECK(tx(SYNC_T_TIME, badt, 10) && resp_type() == SYNC_T_ERR, "TIME with epoch 0 rejected");
 

@@ -6,13 +6,13 @@ list(FILTER WATCH_CORE EXCLUDE REGEX "plat_posix\\.c$|net_curl\\.c$|wifi_ctl_pos
 
 idf_component_register(
     SRCS
-        main.c wifi.c net_esp.c plat_esp.c audio_esp.c buttons_esp.c perf_esp.c imu_esp.c haptic_esp.c pm_esp.c
+        main.c wifi.c net_esp.c plat_esp.c audio_esp.c buttons_esp.c perf_esp.c imu_esp.c haptic_esp.c pm_esp.c ota_esp.c
         ${WATCH_ROOT}/src/launcher.c
         ${WATCH_CORE}
     INCLUDE_DIRS . ${WATCH_ROOT}/src
     REQUIRES
         esp_wifi esp_event esp_netif nvs_flash esp_http_client esp-tls mbedtls json
-        esp_timer esp_system lwip driver
+        esp_timer esp_system lwip driver app_update esp_app_format
         waveshare__esp32_s3_touch_amoled_2_06 lvgl joltwallet__littlefs)
 
 # lvgl.h подключается как "lvgl.h" (см. src/watch/lvgl_inc.h); данные лежат на LittleFS в /flash

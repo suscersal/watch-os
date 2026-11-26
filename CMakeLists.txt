@@ -114,7 +114,7 @@ add_custom_target(paired_test COMMAND $<TARGET_FILE:watch_paired_test> DEPENDS w
 
 # Рукопожатие с постоянным токеном (sync_rx.c + paired.c, остальное заглушки), с AddressSanitizer/UBSan:
 #   cmake --build build --target pairing_rx_test
-add_executable(watch_pairing_rx_test EXCLUDE_FROM_ALL tests/pairing_rx_test.c src/watch/sync_rx.c src/watch/paired.c src/watch/fs_posix.c src/watch/sha256.c src/watch/crc32.c ${CJSON_SRC})
+add_executable(watch_pairing_rx_test EXCLUDE_FROM_ALL tests/pairing_rx_test.c src/watch/ota.c src/watch/sync_rx.c src/watch/paired.c src/watch/fs_posix.c src/watch/sha256.c src/watch/crc32.c ${CJSON_SRC})
 target_compile_definitions(watch_pairing_rx_test PRIVATE LV_CONF_INCLUDE_SIMPLE)
 target_compile_options(watch_pairing_rx_test PRIVATE -g -fsanitize=address,undefined)
 target_link_options(watch_pairing_rx_test PRIVATE -fsanitize=address,undefined)

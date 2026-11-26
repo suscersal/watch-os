@@ -44,6 +44,8 @@ class MainActivity : Activity() {
     private val worker = Executors.newSingleThreadExecutor()
     private val REQ_PICK = 1
     private val REQ_AUDIO = 2
+    private val REQ_FW = 3
+    private lateinit var fwBtn: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +83,8 @@ class MainActivity : Activity() {
         root.addView(pickBtn)
         root.addView(audioBtn)
         root.addView(timeBtn)
+        fwBtn = Button(this).apply { text = "Update firmware (watch_os.bin)"; setOnClickListener { pickFirmware() } }
+        root.addView(fwBtn)
         root.addView(Button(this).apply { text = "Forget this watch"; setOnClickListener { forgetWatch() } })
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100; visibility = View.INVISIBLE }
@@ -195,9 +199,82 @@ class MainActivity : Activity() {
         startActivityForResult(Intent.createChooser(i, "Choose music"), REQ_AUDIO)
     }
 
+    private fun pickFirmware() {
+        val i = Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*"; addCategory(Intent.CATEGORY_OPENABLE) }
+        startActivityForResult(Intent.createChooser(i, "Choose watch_os.bin"), REQ_FW)
+    }
+
+    private fun fileName(uri: Uri): String {
+        var n: String? = null
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) n = c.getString(0) }
+        return n ?: uri.lastPathSegment ?: "file"
+    }
+
+    /** Прошивку часы принимают только по одноразовому коду с экрана Sync (токен не годится), поэтому код обязателен. */
+    private fun confirmFirmware(uri: Uri) {
+        val code = codeEdit.text.toString().trim()
+        if (hostEdit.text.toString().trim().isEmpty() || code.length != 6) {
+            say("Firmware update needs the watch address and the 6-digit code shown on the Sync screen of the watch (a saved pairing is not enough).")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Update firmware?")
+            .setMessage("The watch installs this file and restarts. Keep it above 30% or on the charger and do not close Sync. " +
+                "If the new firmware does not start, the watch goes back to the old one.\n\n${fileName(uri)}")
+            .setPositiveButton("Update") { _, _ -> updateFirmware(uri) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun updateFirmware(uri: Uri) {
+        var host = hostEdit.text.toString().trim()
+        var port = portEdit.text.toString().trim().toIntOrNull() ?: 8765
+        if (host.contains(":")) { port = host.substringAfter(":").toIntOrNull() ?: port; host = host.substringBefore(":") }
+        val code = codeEdit.text.toString().trim()
+        busy(true)
+        worker.execute {
+            var step = "check"
+            try {
+                var size = 0L
+                val crc = java.util.zip.CRC32()
+                val head = ByteArray(512)
+                var hn = 0
+                contentResolver.openInputStream(uri)!!.use { ins ->
+                    val b = ByteArray(65536)
+                    while (true) {
+                        val n = ins.read(b)
+                        if (n < 0) break
+                        if (hn < head.size) { val k = minOf(n, head.size - hn); System.arraycopy(b, 0, head, hn, k); hn += k }
+                        crc.update(b, 0, n)
+                        size += n
+                    }
+                }
+                firmwareProblem(head.copyOf(hn), size)?.let { throw WatchException(it) }
+                step = "connect"
+                WatchClient(host, port).use { w ->
+                    say("Connecting to $host:$port ...")
+                    w.connect()
+                    step = "hello"
+                    w.hello(code, android.os.Build.MODEL ?: "phone")
+                    step = "firmware"
+                    say("Installing firmware (${size / 1024} KB). Keep this screen open.")
+                    w.sendFirmware(size, crc.value, { contentResolver.openInputStream(uri)!! }) { done, total ->
+                        runOnUiThread { progress.progress = (done * 100 / total).toInt() }
+                    }
+                    say("Firmware installed. The watch restarts in a few seconds and is back in about 10 s.")
+                }
+            } catch (e: Exception) {
+                say("Error at $step: ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                busy(false)
+            }
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_FW) { if (resultCode == RESULT_OK) data?.data?.let { confirmFirmware(it) }; return }
         if ((requestCode != REQ_PICK && requestCode != REQ_AUDIO) || resultCode != RESULT_OK || data == null) return
         val uris = ArrayList<Uri>()
         data.clipData?.let { c -> for (k in 0 until c.itemCount) uris.add(c.getItemAt(k).uri) }
@@ -211,6 +288,7 @@ class MainActivity : Activity() {
         pickBtn.isEnabled = !b
         timeBtn.isEnabled = !b
         audioBtn.isEnabled = !b
+        fwBtn.isEnabled = !b
         progress.visibility = if (b) View.VISIBLE else View.INVISIBLE
         if (!b) progress.progress = 0
     }

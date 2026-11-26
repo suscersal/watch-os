@@ -76,6 +76,8 @@ jobs:
             ```
             esptool.py --chip esp32s3 -p <порт> write_flash 0x0 watch-os-full.bin
             ```
+            **Обновить по воздуху** (без USB и разборки): `watch_os.bin` на телефон, Watch Sync, Update firmware.
+            Первый раз с разметкой OTA прошейте по USB полным образом (см. esp32/README.md).
             Коммит: ${{ github.sha }}
           files: |
             esp32/build/watch-os-full.bin

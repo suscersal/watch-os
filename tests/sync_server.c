@@ -3,6 +3,7 @@
 #include "watch/clock.h"
 #include "watch/lvgl_inc.h"
 #include "watch/photos.h"
+#include "fake_ota.h"
 #include "watch/sync_net.h"
 #include "watch/sync_rx.h"
 #include <stdio.h>
@@ -25,6 +26,7 @@ int main(int argc, char **argv)
         printf("Run this from an empty scratch directory, not from the project root.\n");
         return 2;
     }
+    ota_set_hw(&FAKE_OTA);                 // прошивка пишется в fw_received.bin (проверка клиентов)
     lv_init();
     lv_display_t *d = lv_display_create(410, 502);
     static uint8_t buf[410 * 502 * 4];
@@ -42,6 +44,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < n; i++) printf(" %08x", (unsigned)ids[i]);
     struct tm t;
     if (clock_local(&t)) printf("\nTIME %04d-%02d-%02d", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday); else printf("\nTIME none");
+    printf("\nFIRMWARE %lu restarts=%d", fo_total, fo_restarts);
     printf("\nSESSIONS_LEFT %d\n", sessions_left);
     sync_net_stop();
     return 0;

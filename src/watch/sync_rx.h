@@ -19,6 +19,7 @@ typedef enum {
     SYNC_EV_PHOTO_DELETED,
     SYNC_EV_AUDIO,           // принят и сохранён аудиофайл (data/music)
     SYNC_EV_MESSAGE,         // принято уведомление (уже добавлено в messages)
+    SYNC_EV_FIRMWARE,        // прошивка принята и проверена: часы сейчас перезагрузятся
     SYNC_EV_PAIRED,          // телефону выдан постоянный токен (список сопряжённых изменился)
     SYNC_EV_DISCONNECTED,
 } sync_event_t;

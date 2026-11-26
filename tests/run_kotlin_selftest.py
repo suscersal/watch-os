@@ -12,11 +12,15 @@ subprocess.run([kotlinc, os.path.join(root, "android/app/src/main/java/com/watch
                 os.path.join(root, "android/jvmtest/ProtocolSelfTest.kt"), "-include-runtime", "-d", jar], check=True,
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 srv = subprocess.Popen([server, "18766", "2"], cwd=work, stdout=subprocess.PIPE, text=True)
-code = srv.stdout.readline().split()[1]
+code = ""
+for line in srv.stdout:                       # перед CODE сервер печатает отладочные строки LTRACE
+    if line.startswith("CODE "):
+        code = line.split()[1]
+        break
 r = subprocess.run(["java", "-jar", jar, "127.0.0.1", "18766", code], capture_output=True, text=True, timeout=120)
 print(r.stdout, r.stderr)
 out = srv.communicate(timeout=60)[0]
 print("server:", out.strip().replace("\n", " | "))
-ok = r.returncode == 0 and "PHOTOS 2" in out and "a1b2c3d4" in out and "TIME 2023-11-15" in out
+ok = r.returncode == 0 and "PHOTOS 2" in out and "a1b2c3d4" in out and "TIME 2023-11-15" in out and "restarts=1" in out and os.path.getsize(os.path.join(work, "fw_received.bin")) == 150000
 print("RESULT:", "PASS" if ok else "FAIL")
 sys.exit(0 if ok else 1)

@@ -14,7 +14,9 @@
 #include "watch/audio.h"
 #include "watch/photos.h"
 
+#include "fake_ota.h"
 static bool g_locked;
+bool plat_battery(int *pct, bool *chg) { *pct = 80; *chg = false; return true; }
 bool lock_screen_is_locked(void) { return g_locked; }
 void clock_set(int64_t e, int tz) { (void)e; (void)tz; }
 void messages_add(uint32_t a, uint32_t b, const char *c, const char *d, const char *e) { (void)a;(void)b;(void)c;(void)d;(void)e; }
@@ -75,6 +77,10 @@ int main(void)
     CHECK(hello_token(tok) && last_type() == SYNC_T_HELLO_OK, "HELLO_TOKEN works with no code");
     CHECK(feed(SYNC_T_PHOTO_LIST, NULL, 0) && last_type() == SYNC_T_LIST, "full scope after token");
     CHECK(feed(SYNC_T_PAIR_REQ, NULL, 0) && last_type() == SYNC_T_ERR && last_err() == SYNC_E_SCOPE, "token cannot mint new tokens");
+    ota_set_hw(&FAKE_OTA);
+    { uint8_t fb[8] = { 0, 0, 4, 0, 1, 2, 3, 4 };                       // 256 КБ, любой crc
+      CHECK(feed(SYNC_T_FW_BEGIN, fb, 8) && last_type() == SYNC_T_ERR && last_err() == SYNC_E_SCOPE, "token session cannot flash firmware (code only)"); }
+    ota_set_hw(NULL);
     sync_rx_close();
 
     sync_rx_open("", &IO);

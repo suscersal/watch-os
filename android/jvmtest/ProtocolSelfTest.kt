@@ -3,6 +3,7 @@
 import com.watchos.sync.WatchClient
 import com.watchos.sync.WatchException
 import com.watchos.sync.ensureJfif
+import com.watchos.sync.firmwareProblem
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -58,6 +59,26 @@ fun main(args: Array<String>) {
         check(w.listPhotos() == setOf(0xA1B2C3D4L, 7L), "list returns both ids")
         try { w.sendPhoto(9L, 1L, thumbA, jpeg(600, 700, Color.GREEN)); check(false, "oversized image must fail") }
         catch (e: WatchException) { check(e.message!!.contains("format"), "oversized image -> format error") }
+
+        // --- прошивка: проверка файла на телефоне и отправка в (подставной) OTA-слот
+        fun image(n: Int): ByteArray = ByteArray(n) { (it * 31 + 7).toByte() }.also {
+            it[0] = 0xE9.toByte(); it[12] = 9; it[13] = 0; it[32] = 0x32; it[33] = 0x54; it[34] = 0xCD.toByte(); it[35] = 0xAB.toByte()
+        }
+        val fw = image(150_000)
+        check(firmwareProblem(fw.copyOf(512), fw.size.toLong()) == null, "firmwareProblem: watch_os.bin-like file accepted")
+        check(firmwareProblem(fw.copyOf(512), 14L * 1024 * 1024) != null, "firmwareProblem: 14 MB full image rejected (too big)")
+        check(firmwareProblem(fw.copyOf(512), 1000) != null, "firmwareProblem: tiny file rejected")
+        check(firmwareProblem(ByteArray(512), fw.size.toLong()) != null, "firmwareProblem: not an ESP image rejected")
+        check(firmwareProblem(fw.copyOf(512).also { it[13] = 1 }, fw.size.toLong()) != null, "firmwareProblem: other chip rejected")
+        check(firmwareProblem(fw.copyOf(512).also { it[32] = 0 }, fw.size.toLong()) != null, "firmwareProblem: no app descriptor rejected")
+        val fwCrc = java.util.zip.CRC32().apply { update(fw) }.value
+        var fwProgress = 0L
+        w.sendFirmware(fw.size.toLong(), fwCrc, { fw.inputStream() }) { d, _ -> fwProgress = d }
+        check(fwProgress == fw.size.toLong(), "firmware sent, progress reached the end")
+        // не образ: часы отвергают первый же блок, закрывают соединение, а клиент показывает причину (последняя проверка сеанса)
+        val junk = ByteArray(150_000)
+        try { w.sendFirmware(junk.size.toLong(), java.util.zip.CRC32().apply { update(junk) }.value, { junk.inputStream() }); check(false, "junk firmware must fail") }
+        catch (e: Exception) { check(e is WatchException && e.message!!.contains("format"), "junk firmware -> watch error text (format), got: ${e.message}") }
     }
     println(if (failures == 0) "\nKOTLIN ALL PASSED" else "\n$failures FAILED")
     exitProcess(if (failures == 0) 0 else 1)

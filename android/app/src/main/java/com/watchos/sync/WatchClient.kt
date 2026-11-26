@@ -35,6 +35,11 @@ object Proto {
     const val T_AUDIO_END = 0x32
     const val T_AUDIO_COVER = 0x33
     const val AUDIO_MAX_BYTES = 24L * 1024 * 1024
+    const val T_FW_BEGIN = 0x40
+    const val T_FW_DATA = 0x41
+    const val T_FW_END = 0x42
+    const val FW_MAX_BYTES = 4L * 1024 * 1024       // размер OTA-слота на часах
+    const val FW_MIN_BYTES = 64L * 1024
     const val T_MESSAGE = 0x20
     const val T_BYE = 0x7F
     const val MSG_APP_MAX = 32
@@ -59,6 +64,7 @@ object Proto {
         8 -> "not supported"
         9 -> "watch is locked"
         10 -> "not allowed with this code"
+        11 -> "battery too low: put the watch on the charger (needs 30%)"
         else -> "error $code"
     }
 }
@@ -86,6 +92,20 @@ fun ensureJfif(jpeg: ByteArray): ByteArray {
         jpeg[6] == jfif[4] && jpeg[7] == jfif[5] && jpeg[8] == jfif[6] && jpeg[9] == jfif[7]
     if (has) return jpeg
     return byteArrayOf(jpeg[0], jpeg[1]) + jfif + jpeg.copyOfRange(2, jpeg.size)
+}
+
+/**
+ * Быстрая проверка файла прошивки на телефоне (часы проверяют сами, но так понятнее ошибка): нужен именно watch_os.bin
+ * (образ приложения ESP32-S3), а не watch-os-full.bin и не что попало. null - выглядит правильно.
+ */
+fun firmwareProblem(head: ByteArray, size: Long): String? {
+    if (size > Proto.FW_MAX_BYTES) return "this file is too big for the update slot (4 MB). Use watch_os.bin, not watch-os-full.bin"
+    if (size < Proto.FW_MIN_BYTES) return "this file is too small to be firmware. Use watch_os.bin"
+    if (head.size < 36 || head[0] != 0xE9.toByte()) return "this is not an ESP32 firmware image. Use watch_os.bin"
+    if (head[12] != 0x09.toByte() || head[13] != 0x00.toByte()) return "this image is not for ESP32-S3"
+    val magic = byteArrayOf(0x32, 0x54, 0xCD.toByte(), 0xAB.toByte())          // ESP_APP_DESC_MAGIC_WORD 0xABCD5432 на смещении 32
+    if (!head.copyOfRange(32, 36).contentEquals(magic)) return "this is not an application image. Use watch_os.bin"
+    return null
 }
 
 class WatchClient(private val host: String, private val port: Int) : Closeable {
@@ -244,6 +264,39 @@ class WatchClient(private val host: String, private val port: Int) : Closeable {
         send(Proto.T_AUDIO_END)
         reply()
         return true
+    }
+
+    /**
+     * Прошивка (watch_os.bin) в неактивный OTA-слот. Работает только после hello(code): по токену часы откажут (ошибка 10).
+     * Образ уходит потоком; после FW_END часы проверяют его целиком и сами перезагружаются через пару секунд.
+     * Ошибку часов посреди передачи (не тот образ, нет места) часы присылают и закрывают соединение: показываем её текст.
+     */
+    fun sendFirmware(size: Long, crc: Long, open: () -> java.io.InputStream, onProgress: (Long, Long) -> Unit = { _, _ -> }) {
+        val b = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+        b.putInt(size.toInt()).putInt(crc.toInt())
+        send(Proto.T_FW_BEGIN, b.array())
+        reply()                                              // стирание слота может занять несколько секунд
+        var sent = 0L
+        try {
+            open().use { ins ->
+                val buf = ByteArray(Proto.CHUNK)
+                while (true) {
+                    var n = 0
+                    while (n < buf.size) { val r = ins.read(buf, n, buf.size - n); if (r < 0) break; n += r }
+                    if (n == 0) break
+                    send(Proto.T_FW_DATA, if (n == buf.size) buf else buf.copyOf(n))
+                    sent += n
+                    onProgress(sent, size)
+                    if (n < buf.size) break
+                }
+            }
+        } catch (e: java.io.IOException) {
+            try { reply() } catch (we: WatchException) { throw we } catch (_: Exception) { }     // причина обрыва, если часы успели её прислать
+            throw e
+        }
+        if (sent != size) throw WatchException("the file changed while sending")
+        send(Proto.T_FW_END)
+        reply()
     }
 
     override fun close() {

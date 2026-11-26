@@ -62,3 +62,6 @@ CONFIG_LV_IMAGE_HEADER_CACHE_DEF_CNT=64
 
 # Экономия энергии: динамическая частота процессора (см. main/pm_esp.c, Kconfig WATCH_POWER_SAVE)
 CONFIG_PM_ENABLE=y
+
+# Обновление по воздуху: откат на прежнюю прошивку, если новая не подтвердила себя (main/ota_esp.c)
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

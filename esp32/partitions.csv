@@ -1,5 +1,9 @@
 # Name,   Type, SubType, Offset,  Size, Flags
-nvs,      data, nvs,     0x9000,  0x6000,
+# Два слота приложения для обновления по воздуху (esp32/main/ota_esp.c). Новая прошивка пишется в неактивный слот,
+# otadata помнит, какой слот загружать. Flash 16 МБ: 0x10000 + 2 x 4M + 7M = 15.06 МБ.
+nvs,      data, nvs,     0x9000,  0x4000,
+otadata,  data, ota,     0xd000,  0x2000,
 phy_init, data, phy,     0xf000,  0x1000,
-factory,  app,  factory, 0x10000, 4M,
-storage,  data, spiffs,  ,        6M,
+ota_0,    app,  ota_0,   0x10000, 4M,
+ota_1,    app,  ota_1,   ,        4M,
+storage,  data, spiffs,  ,        7M,

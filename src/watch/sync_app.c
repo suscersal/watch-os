@@ -55,6 +55,7 @@ static void on_event(sync_event_t ev, void *ud)
         set_status(t, 0x22C55E);
         break;
     case SYNC_EV_AUDIO:         sys_toast("Audio received"); break;
+    case SYNC_EV_FIRMWARE:      set_status("Firmware installed. Restarting...", 0x22C55E); sys_toast("Firmware installed"); break;
     case SYNC_EV_PAIRED:        sys_toast("Phone paired"); refresh_pair_btn(); break;
     case SYNC_EV_PHOTO_DELETED: sys_toast("Photo removed by phone"); break;
     case SYNC_EV_MESSAGE:       break;     // уведомление уже лежит в messages; на экране синхронизации ничего не меняем
