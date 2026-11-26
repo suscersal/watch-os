@@ -233,8 +233,9 @@ static void build_grid(void)
 
             const lv_image_dsc_t *img = icon_image(app_manager_get(i)->icon);
             if (img) {   // готовая круглая иконка (assets/icons): кружок и глиф уже внутри картинки
-                lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
-                lv_obj_set_style_border_width(btn, 0, 0);
+                // убираем стили темы: градиент, кромка и анимация нажатия перерисовывали круг при каждом касании
+                lv_obj_remove_style_all(btn);
+                lv_obj_set_size(btn, ICON, ICON);
                 lv_obj_t *im = lv_image_create(btn);
                 lv_image_set_src(im, img);
                 lv_obj_center(im);

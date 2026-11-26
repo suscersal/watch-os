@@ -6,7 +6,35 @@
 #include "sdkconfig.h"
 #if CONFIG_PM_ENABLE && CONFIG_WATCH_POWER_SAVE
 #include "esp_pm.h"
+
+static esp_pm_lock_handle_t s_cpu_lock;
+static bool s_cpu_held;
+
+// Задача LVGL работает без блокировок питания, поэтому при DFS отрисовка шла на минимальной частоте
+// (полосы на экране, задержка касания). Пока идёт проход отрисовки, держим максимум.
+static void render_start_cb(lv_event_t *e)
+{
+    (void)e;
+    if (s_cpu_lock && !s_cpu_held) { esp_pm_lock_acquire(s_cpu_lock); s_cpu_held = true; }
+}
+
+static void refr_ready_cb(lv_event_t *e)
+{
+    (void)e;
+    if (s_cpu_lock && s_cpu_held) { s_cpu_held = false; esp_pm_lock_release(s_cpu_lock); }
+}
 #endif
+
+void pm_esp_attach_display(lv_display_t *disp)
+{
+#if CONFIG_PM_ENABLE && CONFIG_WATCH_POWER_SAVE
+    if (esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "lvgl", &s_cpu_lock) != ESP_OK) return;
+    lv_display_add_event_cb(disp, render_start_cb, LV_EVENT_RENDER_START, NULL);
+    lv_display_add_event_cb(disp, refr_ready_cb, LV_EVENT_REFR_READY, NULL);
+#else
+    (void)disp;
+#endif
+}
 
 void pm_esp_start(void)
 {

@@ -89,7 +89,7 @@ void app_main(void)
         ESP_LOGE(TAG, "display init failed");
         return;
     }
-    if (bsp_display_lock(0)) { perf_esp_start(disp); bsp_display_unlock(); }   // замер отрисовки, если включено CONFIG_WATCH_PERF_LOG
+    if (bsp_display_lock(0)) { perf_esp_start(disp); pm_esp_attach_display(disp); bsp_display_unlock(); }   // замер отрисовки, если включено CONFIG_WATCH_PERF_LOG
     // После инициализации BSP яркость равна 0: без явной установки экран остаётся чёрным.
     // Яркостью дальше управляет watch/power (затемнение и выключение при бездействии, меню Display).
     ESP_LOGW(TAG, "TRACE 3: perf ok");
