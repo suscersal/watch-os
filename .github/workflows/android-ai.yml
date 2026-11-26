@@ -6,6 +6,7 @@ on:
     tags: ['v*']
     paths:
       - 'android-ai/**'
+      - 'signing/**'
       - '.github/workflows/android-ai.yml'
   workflow_dispatch:
 

@@ -15,6 +15,7 @@ android/app/build/
 android/local.properties
 *.jks
 *.keystore
+!signing/watch-debug.keystore
 *.apk
 *.aab
 *.patch
