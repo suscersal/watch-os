@@ -52,6 +52,9 @@ static void apply_config(const char *ssid, const char *pass)
     wc.sta.pmf_cfg.capable = true;
     wc.sta.pmf_cfg.required = false;
     wc.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
+#ifdef CONFIG_WATCH_POWER_SAVE
+    wc.sta.listen_interval = 10;                       // просыпаться на маяк раз в ~1 с: уведомления приходят с задержкой до секунды
+#endif
     esp_wifi_set_config(WIFI_IF_STA, &wc);
 }
 
@@ -174,7 +177,11 @@ bool wifi_start(void)
     if (esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL) != ESP_OK) return false;
 
     if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) return false;
+#ifdef CONFIG_WATCH_POWER_SAVE
+    esp_wifi_set_ps(WIFI_PS_MAX_MODEM);                // радио спит между маяками (listen_interval)
+#else
     esp_wifi_set_ps(WIFI_PS_MIN_MODEM);                // экономия энергии между передачами
+#endif
     if (esp_wifi_start() != ESP_OK) return false;      // радио включено всегда: без него не работает поиск сетей на экране Settings
     s_started = true;
     return true;

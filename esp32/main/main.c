@@ -14,6 +14,7 @@
 #include "buttons_esp.h"
 #include "perf_esp.h"
 #include "imu_esp.h"
+#include "pm_esp.h"
 #include "watch/clock.h"
 #include "watch/power.h"
 #include "watch/settings.h"
@@ -97,7 +98,8 @@ void app_main(void)
     ESP_LOGW(TAG, "TRACE 4: audio done");
     buttons_esp_start();                // BOOT = назад, PWR = экран вкл/выкл
     ESP_LOGW(TAG, "TRACE 5: buttons ok");
-    imu_esp_start();                    // подъём руки будит экран
+    imu_esp_start();                    // подъём руки будит экран; датчик включается только когда нужен
+    pm_esp_start();                     // динамическая частота процессора (экономия энергии)
 
     ESP_LOGW(TAG, "TRACE 6: imu ok");
     ESP_LOGW(TAG, "heap internal: free %u, largest %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));

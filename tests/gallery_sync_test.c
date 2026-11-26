@@ -103,7 +103,7 @@ static bool exists(const char *p) { return access(p, F_OK) == 0; }
 static uint8_t out[4096];
 static size_t  out_n;
 static void io_send(const uint8_t *d, size_t n, void *ud) { (void)ud; if (out_n + n <= sizeof out) { memcpy(out + out_n, d, n); out_n += n; } }
-static int ev_count[8];
+static int ev_count[16];
 static void on_ev(sync_event_t ev, void *ud) { (void)ud; ev_count[ev]++; }
 
 static void open_session(const char *code) { sync_io_t io = { io_send, NULL }; out_n = 0; sync_rx_open(code, &io); }

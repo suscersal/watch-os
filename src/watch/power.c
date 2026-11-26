@@ -16,10 +16,11 @@
 
 typedef enum { ST_ON, ST_DIM, ST_OFF } state_t;
 
-static int     g_dim_s = 30, g_off_s = 60, g_bright = CONFIG_WATCH_BRIGHTNESS;
+static int     g_dim_s = 15, g_off_s = 30, g_bright = CONFIG_WATCH_BRIGHTNESS;
 static state_t g_state = ST_ON;
 static lv_obj_t   *g_overlay;
 static lv_timer_t *g_timer;
+static lv_timer_t *g_freeze;   // отложенная заморозка отрисовки после выключения экрана
 static bool      g_raise = true;    // будить экран при подъёме руки (если платформа это умеет)
 static bool      g_forced_off;      // экран выключен кнопкой: таймер бездействия его не включает
 static void      (*g_backend)(int);
@@ -44,16 +45,32 @@ static void apply_brightness(void)
     g_backend(pct);
 }
 
+// Экран выключен: после того как чёрная накладка отрисована, перестаём перерисовывать всё остальное (циферблат,
+// строка состояния): иначе процессор и QSPI работают впустую. Касание/кнопка включают отрисовку обратно.
+static void freeze_cb(lv_timer_t *t)
+{
+    LV_UNUSED(t);
+    g_freeze = NULL;                                  // таймер одноразовый и удалится сам
+    if (g_state == ST_OFF) lv_display_enable_invalidation(NULL, false);
+}
+
 static void set_state(state_t s)
 {
     if (s == g_state) return;
     state_t prev = g_state;
     g_state = s;
+    if (g_freeze) { lv_timer_delete(g_freeze); g_freeze = NULL; }
+    if (prev == ST_OFF) lv_display_enable_invalidation(NULL, true);   // до показа экрана, чтобы он отрисовался
+    if (s == ST_OFF) {
+        g_freeze = lv_timer_create(freeze_cb, 400, NULL);
+        if (g_freeze) lv_timer_set_repeat_count(g_freeze, 1);
+    }
     if (g_overlay) {
         if (s == ST_OFF) lv_obj_remove_flag(g_overlay, LV_OBJ_FLAG_HIDDEN);
         else             lv_obj_add_flag(g_overlay, LV_OBJ_FLAG_HIDDEN);
     }
     apply_brightness();
+    if (prev == ST_OFF && s != ST_OFF) lv_obj_invalidate(lv_screen_active());
     if (prev == ST_OFF && s == ST_ON && g_wake_cb) g_wake_cb();
 }
 
