@@ -74,6 +74,12 @@ void app_main(void)
         },
     };
     cfg.lvgl_port_cfg.task_stack = CONFIG_WATCH_LVGL_STACK;
+#if CONFIG_WATCH_LCD_FULL_BUFFER
+    // Два буфера на весь экран в PSRAM (DMA). Режим LVGL остаётся частичным: прокрутка (весь экран) рисуется
+    // за один проход и уходит одной передачей, без полос; мелкие обновления рисуют только свою область.
+    cfg.buffer_size = BSP_LCD_H_RES * BSP_LCD_V_RES;
+    cfg.flags.buff_spiram = true;
+#endif
 
     ESP_LOGW(TAG, "TRACE 1: display start");
     lv_display_t *disp = bsp_display_start_with_config(&cfg);
