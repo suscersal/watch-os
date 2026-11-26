@@ -104,3 +104,38 @@ bool plat_battery(int *pct, bool *charging)
     *charging = (st2 >> 5) == 1;
     return true;
 }
+
+// ---------- microSD (слот SDMMC, 1 линия данных; монтирует BSP) ----------
+// Контакта обнаружения карты у платы нет, поэтому фоновая задача раз в SD_POLL_MS пробует смонтировать карту,
+// а пока она смонтирована - проверяет, что она отвечает (sdmmc_get_status). Нечитаемую карту не форматируем.
+// Первый вызов plat_sd_present()/plat_sd_root() запускает задачу; до первого монтирования карты "нет".
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "sdmmc_cmd.h"
+
+#define SD_POLL_MS 4000
+
+static volatile bool g_sd_ok;
+static TaskHandle_t  g_sd_task;
+
+static void sd_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        if (!g_sd_ok) {
+            if (bsp_sdcard_mount() == ESP_OK) g_sd_ok = true;
+        } else if (!bsp_sdcard || sdmmc_get_status(bsp_sdcard) != ESP_OK) {
+            bsp_sdcard_unmount();                              // карту вынули: освобождаем ресурсы, чтобы вставка подхватилась
+            g_sd_ok = false;
+        }
+        vTaskDelay(pdMS_TO_TICKS(SD_POLL_MS));
+    }
+}
+
+bool plat_sd_present(void)
+{
+    if (!g_sd_task) xTaskCreate(sd_task, "sd_watch", 6144, NULL, 3, &g_sd_task);   // первый вызов - из интерфейса
+    return g_sd_ok;
+}
+
+const char *plat_sd_root(void) { return plat_sd_present() ? BSP_SD_MOUNT_POINT : NULL; }

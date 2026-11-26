@@ -62,3 +62,13 @@ bool plat_battery(int *pct, bool *charging)
     *charging = strchr(e, '+') != NULL;
     return true;
 }
+
+const char *plat_sd_root(void)
+{
+    const char *e = getenv("WATCH_SD");
+    if (!e || !*e) return "data/sd";
+    if (strcmp(e, "off") == 0 || strcmp(e, "0") == 0) return NULL;
+    return e;
+}
+
+bool plat_sd_present(void) { return plat_sd_root() != NULL; }

@@ -4,6 +4,7 @@
 #include "audio.h"
 #include "fs.h"
 #include "photos.h"
+#include "plat.h"
 #include "sys_ui.h"
 #include "watch_fonts.h"
 #include "ws_style.h"
@@ -30,7 +31,8 @@ typedef struct {
     uint32_t dur_ms;
 } track_t;
 
-static char    g_dir[96] = "data/music";
+static char    g_dir[96] = "data/music";      // внутренняя память
+static char    g_sd_dir[96];                    // <корень карты>/music, пока карта вставлена
 static track_t tr[MAX_TRACKS];
 static int     ntr, cur = -1;
 static bool    shuffle, demo_queue;
@@ -41,12 +43,12 @@ static lv_obj_t *scr_player, *scr_volume, *scr_queue;
 // ---------- список треков ----------
 static void add_cb(const char *name, void *ud)
 {
-    LV_UNUSED(ud);
+    const char *dir = ud;
     size_t n = strlen(name);
     if (n < 5 || strcasecmp(name + n - 4, ".wav") != 0 || ntr >= MAX_TRACKS) return;
     track_t *t = &tr[ntr];
     memset(t, 0, sizeof *t);
-    snprintf(t->path, sizeof t->path, "%s/%s", g_dir, name);
+    snprintf(t->path, sizeof t->path, "%s/%s", dir, name);
     wav_info_t w;
     if (!audio_wav_info(t->path, &w)) return;
     t->dur_ms = w.duration_ms;
@@ -72,7 +74,9 @@ static void add_cb(const char *name, void *ud)
 static void load_tracks(void)
 {
     ntr = 0; demo_queue = false;
-    fs_list_dir(g_dir, add_cb, NULL);
+    const char *sd = music_dir();                // карта вставлена: сначала её треки, затем те, что уже лежат во внутренней памяти
+    if (strcmp(sd, g_dir) != 0) fs_list_dir(sd, add_cb, (void *)sd);
+    fs_list_dir(g_dir, add_cb, g_dir);
     if (ntr == 0) {                        // файлов нет: демо-очередь из макета, звука нет
         demo_queue = true;
         const char *T[][3] = { { "Midnight City", "M83", "Hurry Up, We\xE2\x80\x99re Dreaming" }, { "Wait", "M83", "Hurry Up, We\xE2\x80\x99re Dreaming" } };
@@ -93,9 +97,19 @@ void music_init(const char *root)
     snprintf(g_dir, sizeof g_dir, "%s/music", root);
     fs_mkdir(root);
     fs_mkdir(g_dir);
+    plat_sd_present();                     // запускает наблюдение за microSD (ESP32) с самого старта
 }
 
-const char *music_dir(void) { return g_dir; }
+// Куда принимать новую музыку: на карту, если она вставлена и папка создалась, иначе во внутреннюю память.
+const char *music_dir(void)
+{
+    const char *root = plat_sd_root();
+    if (root) {
+        snprintf(g_sd_dir, sizeof g_sd_dir, "%s/music", root);
+        if (fs_mkdir(g_sd_dir)) return g_sd_dir;
+    }
+    return g_dir;
+}
 
 static void fmt_time(char *b, size_t n, uint32_t ms, bool neg)
 {
