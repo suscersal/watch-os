@@ -1,18 +1,32 @@
 #include "photos.h"
 #include "fs.h"
+#include "plat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static char g_dir[96] = "data/photos";
 
-typedef struct { uint32_t taken, id; } entry_t;
-typedef struct { entry_t *e; int n, cap; } list_t;
+static char g_sd_dir[96];     // <корень карты>/photos, пока карта вставлена
 
-static void path_of(uint32_t taken, uint32_t id, bool thumb, char *out, size_t n)
+typedef struct { uint32_t taken, id; bool sd; } entry_t;
+typedef struct { entry_t *e; int n, cap; bool sd; } list_t;
+
+static void path_of(const char *dir, uint32_t taken, uint32_t id, bool thumb, char *out, size_t n)
 {
-    snprintf(out, n, "%s/%08x_%08x%s.jpg", g_dir, (unsigned)taken, (unsigned)id, thumb ? ".t" : "");
+    snprintf(out, n, "%s/%08x_%08x%s.jpg", dir, (unsigned)taken, (unsigned)id, thumb ? ".t" : "");
 }
+
+// Папка фото на карте или NULL, если карты нет или папка не создалась.
+static const char *sd_dir(void)
+{
+    const char *root = plat_sd_root();
+    if (!root) return NULL;
+    snprintf(g_sd_dir, sizeof g_sd_dir, "%s/photos", root);
+    return fs_mkdir(g_sd_dir) ? g_sd_dir : NULL;
+}
+
+static const char *dir_of(bool sd) { return sd ? g_sd_dir : g_dir; }
 
 void photos_init(const char *dir)
 {
@@ -40,7 +54,7 @@ static void scan_cb(const char *name, void *ud)
         if (!ne) return;
         l->e = ne; l->cap = nc;
     }
-    l->e[l->n].taken = taken; l->e[l->n].id = id; l->n++;
+    l->e[l->n].taken = taken; l->e[l->n].id = id; l->e[l->n].sd = l->sd; l->n++;
 }
 
 static int cmp_desc(const void *a, const void *b)
@@ -54,6 +68,9 @@ static int cmp_desc(const void *a, const void *b)
 static void scan(list_t *l)
 {
     memset(l, 0, sizeof *l);
+    const char *sd = sd_dir();                 // фото с карты и из внутренней памяти показываются вместе
+    if (sd) { l->sd = true; fs_list_dir(sd, scan_cb, l); }
+    l->sd = false;
     fs_list_dir(g_dir, scan_cb, l);
     if (l->n > 1) qsort(l->e, (size_t)l->n, sizeof l->e[0], cmp_desc);
 }
@@ -75,23 +92,30 @@ int photos_list(uint32_t *ids, uint32_t *taken, int max)
     return n;
 }
 
-static bool find(uint32_t id, uint32_t *taken)
+static bool find(uint32_t id, uint32_t *taken, bool *sd)
 {
     list_t l; scan(&l);
     bool found = false;
-    for (int i = 0; i < l.n; i++) if (l.e[i].id == id) { found = true; if (taken) *taken = l.e[i].taken; break; }
+    for (int i = 0; i < l.n; i++) if (l.e[i].id == id) {
+        found = true;
+        if (taken) *taken = l.e[i].taken;
+        if (sd) *sd = l.e[i].sd;
+        break;
+    }
     free(l.e);
     return found;
 }
 
-bool photos_exists(uint32_t id) { return find(id, NULL); }
+bool photos_exists(uint32_t id) { return find(id, NULL, NULL); }
 
 bool photos_store(uint32_t id, uint32_t taken, const uint8_t *thumb, size_t tn, const uint8_t *full, size_t fn)
 {
-    if (find(id, NULL)) return false;
+    if (find(id, NULL, NULL)) return false;
+    const char *dir = sd_dir();                // новые фото - на карту, если она вставлена
+    if (!dir) dir = g_dir;
     char p[160], pt[160];
-    path_of(taken, id, false, p, sizeof p);
-    path_of(taken, id, true, pt, sizeof pt);
+    path_of(dir, taken, id, false, p, sizeof p);
+    path_of(dir, taken, id, true, pt, sizeof pt);
     // сначала миниатюра, потом полный кадр: фото появляется в списке только когда записан полный файл
     if (!fs_write_file(pt, (const char *)thumb, tn)) return false;
     if (!fs_write_file(p, (const char *)full, fn)) { fs_remove(pt); return false; }
@@ -100,20 +124,20 @@ bool photos_store(uint32_t id, uint32_t taken, const uint8_t *thumb, size_t tn, 
 
 uint8_t *photos_load(uint32_t id, bool thumb, size_t *len)
 {
-    uint32_t taken;
-    if (!find(id, &taken)) return NULL;
+    uint32_t taken; bool sd;
+    if (!find(id, &taken, &sd)) return NULL;
     char p[160];
-    path_of(taken, id, thumb, p, sizeof p);
+    path_of(dir_of(sd), taken, id, thumb, p, sizeof p);
     return (uint8_t *)fs_read_file_n(p, thumb ? PHOTO_THUMB_MAX_BYTES : PHOTO_FULL_MAX_BYTES, len);
 }
 
 bool photos_delete(uint32_t id)
 {
-    uint32_t taken;
-    if (!find(id, &taken)) return false;
+    uint32_t taken; bool sd;
+    if (!find(id, &taken, &sd)) return false;
     char p[160], pt[160];
-    path_of(taken, id, false, p, sizeof p);
-    path_of(taken, id, true, pt, sizeof pt);
+    path_of(dir_of(sd), taken, id, false, p, sizeof p);
+    path_of(dir_of(sd), taken, id, true, pt, sizeof pt);
     bool ok = fs_remove(p);
     fs_remove(pt);
     return ok;

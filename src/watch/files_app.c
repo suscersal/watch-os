@@ -1,5 +1,6 @@
 #include "files_app.h"
 #include "fs.h"
+#include "plat.h"
 #include "sys_ui.h"
 #include "watch_fonts.h"
 #include "ws_style.h"
@@ -26,12 +27,28 @@ static bool      g_truncated;
 static char      g_del_path[PATH_MAX_LEN];  // что удаляем (для окна подтверждения)
 
 static const char *const ROOTS[] = { "apps", "data", "packages" };
+#define SD_NAME "sdcard"      // виртуальная папка в корне: показывает microSD, пока она вставлена
 
 static void build_list(void);
 static void build_async(void *ud) { LV_UNUSED(ud); build_list(); }
 
 // ---------- пути ----------
-static void real_path(const char *rel, char *out, size_t n) { snprintf(out, n, "%s%s", WATCH_ROOT, rel); }
+static bool is_sd_rel(const char *rel)
+{
+    size_t k = strlen(SD_NAME);
+    return strncmp(rel, SD_NAME, k) == 0 && (rel[k] == '\0' || rel[k] == '/');
+}
+
+static void real_path(const char *rel, char *out, size_t n)
+{
+    if (is_sd_rel(rel)) {                                  // "sdcard/music/a.wav" -> "<корень карты>/music/a.wav"
+        const char *root = plat_sd_root();
+        if (!root) { snprintf(out, n, "/.no-sd%s", rel + strlen(SD_NAME)); return; }   // карту вынули: пути не существует
+        snprintf(out, n, "%s%s", root, rel + strlen(SD_NAME));
+        return;
+    }
+    snprintf(out, n, "%s%s", WATCH_ROOT, rel);
+}
 
 static bool join(const char *dir, const char *name, char *out, size_t n)
 {
@@ -109,6 +126,11 @@ static void load_dir(void)
             snprintf(e->name, sizeof e->name, "%s", ROOTS[i]);
             e->dir = true;
         }
+        if (plat_sd_root() && g_n < ENTRIES_MAX) {         // карта вставлена: она видна как папка sdcard
+            entry_t *e = &g_ent[g_n++];
+            snprintf(e->name, sizeof e->name, "%s", SD_NAME);
+            e->dir = true;
+        }
         return;
     }
     scan_t sc;
@@ -168,7 +190,7 @@ static void delete_done(bool ok, void *ud)
 
     // Фото в Gallery - пара файлов: полный кадр и миниатюра (<имя>.jpg и <имя>.t.jpg). Удаляем обе половины.
     size_t n = strlen(g_del_path);
-    if (strncmp(g_del_path, "data/photos/", 12) == 0 && n > 6) {
+    if ((strncmp(g_del_path, "data/photos/", 12) == 0 || strncmp(g_del_path, SD_NAME "/photos/", sizeof(SD_NAME "/photos/") - 1) == 0) && n > 6) {
         char other[PATH_MAX_LEN];
         if (ends_with(g_del_path, ".t.jpg")) snprintf(other, sizeof other, "%.*s.jpg", (int)(n - 6), g_del_path);
         else if (ends_with(g_del_path, ".jpg")) snprintf(other, sizeof other, "%.*s.t.jpg", (int)(n - 4), g_del_path);
