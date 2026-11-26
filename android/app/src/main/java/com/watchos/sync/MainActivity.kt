@@ -11,7 +11,9 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -45,6 +47,9 @@ class MainActivity : Activity() {
     private val REQ_PICK = 1
     private val REQ_AUDIO = 2
     private val REQ_FW = 3
+    private val REQ_FULL = 4
+    private lateinit var usbBtn: Button
+    private lateinit var keepBox: CheckBox
     private lateinit var fwBtn: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,6 +90,11 @@ class MainActivity : Activity() {
         root.addView(timeBtn)
         fwBtn = Button(this).apply { text = "Update firmware (watch_os.bin)"; setOnClickListener { pickFirmware() } }
         root.addView(fwBtn)
+        root.addView(text("Full image over USB (rescue, new partition table, bootloader). Plug the watch into the phone with a USB-C OTG cable.", 13f))
+        keepBox = CheckBox(this).apply { text = "Keep my data (PIN, apps, photos, music, Wi-Fi)"; isChecked = true }
+        usbBtn = Button(this).apply { text = "Flash full image over USB (watch-os-full.bin)"; setOnClickListener { pickFull() } }
+        root.addView(keepBox)
+        root.addView(usbBtn)
         root.addView(Button(this).apply { text = "Forget this watch"; setOnClickListener { forgetWatch() } })
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100; visibility = View.INVISIBLE }
@@ -204,6 +214,55 @@ class MainActivity : Activity() {
         startActivityForResult(Intent.createChooser(i, "Choose watch_os.bin"), REQ_FW)
     }
 
+    private fun pickFull() {
+        val i = Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*"; addCategory(Intent.CATEGORY_OPENABLE) }
+        startActivityForResult(Intent.createChooser(i, "Choose watch-os-full.bin"), REQ_FULL)
+    }
+
+    private fun confirmFull(uri: Uri) {
+        val keep = keepBox.isChecked
+        val what = if (keep) "The program and bootloader are replaced; PIN, apps, photos, music and Wi-Fi are kept."
+                   else "The watch is erased completely: PIN, apps, photos and music are lost."
+        AlertDialog.Builder(this)
+            .setTitle("Flash over USB?")
+            .setMessage("$what Do not unplug the cable until it says Done.\n\n${fileName(uri)}")
+            .setPositiveButton("Flash") { _, _ -> flashFull(uri, keep) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Полный образ по USB прямо с телефона (ROM-загрузчик ESP32-S3). keep: nvs и storage не трогаем, данные остаются. */
+    private fun flashFull(uri: Uri, keep: Boolean) {
+        busy(true)
+        runOnUiThread { window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        worker.execute {
+            var step = "file"
+            var port: UsbCdcPort? = null
+            try {
+                val img = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                val plan = FlashPlan.plan(img, keep)
+                step = "usb"
+                val dev = UsbFlash.find(this)
+                    ?: throw FlashException("No watch on USB. Plug it in with a USB-C OTG cable; if it is still not found, hold the BOOT button while plugging.")
+                say("Allow USB access in the system dialog.")
+                if (!UsbFlash.permission(this, dev)) throw FlashException("USB access was not allowed")
+                val p = UsbFlash.open(this, dev)
+                port = p
+                step = "flash"
+                val ef = EspFlasher(p) { say(it) }
+                ef.connect()
+                ef.write(plan) { pct -> runOnUiThread { progress.progress = pct } }
+                say("Done. The watch restarts by itself" + (if (keep) "; your data is kept." else ". Set it up again (PIN, apps)."))
+            } catch (e: Exception) {
+                say("Error at $step: ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                port?.close()
+                runOnUiThread { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+                busy(false)
+            }
+        }
+    }
+
     private fun fileName(uri: Uri): String {
         var n: String? = null
         contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) n = c.getString(0) }
@@ -274,6 +333,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_FULL) { if (resultCode == RESULT_OK) data?.data?.let { confirmFull(it) }; return }
         if (requestCode == REQ_FW) { if (resultCode == RESULT_OK) data?.data?.let { confirmFirmware(it) }; return }
         if ((requestCode != REQ_PICK && requestCode != REQ_AUDIO) || resultCode != RESULT_OK || data == null) return
         val uris = ArrayList<Uri>()
@@ -289,6 +349,7 @@ class MainActivity : Activity() {
         timeBtn.isEnabled = !b
         audioBtn.isEnabled = !b
         fwBtn.isEnabled = !b
+        usbBtn.isEnabled = !b
         progress.visibility = if (b) View.VISIBLE else View.INVISIBLE
         if (!b) progress.progress = 0
     }
