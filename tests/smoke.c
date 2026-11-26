@@ -64,6 +64,21 @@ static void collect(lv_obj_t *o, const lv_obj_class_t *cls)
     for (uint32_t i = 0; i < n; i++) collect(lv_obj_get_child(o, i), cls);
 }
 
+// Вернуться в лаунчер. Свайп вправо уходит "назад" и на вложенных экранах, а если экран не сменился
+// (например, жест перехватил виджет) - нажимаем первую кнопку (на вложенном экране это "назад").
+static void exit_to_launcher(lv_obj_t *launcher, int tries)
+{
+    for (int k = 0; k < tries && lv_screen_active() != launcher; k++) {
+        lv_obj_t *before = lv_screen_active();
+        swipe_right();
+        if (lv_screen_active() == launcher) break;
+        if (lv_screen_active() != before) continue;
+        nfound = 0; collect(lv_screen_active(), &lv_button_class);
+        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);
+        pump(25);
+    }
+}
+
 static int g_fail;
 #define CHECK(c, msg) do { if (!(c)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); g_fail++; } } while (0)
 
@@ -179,13 +194,7 @@ static void tools_flow(lv_obj_t *launcher)
     printf("tools flow done\n");
 
     // выйти из приложения
-    for (int k = 0; k < 8 && lv_screen_active() != launcher; k++) {
-        swipe_right();
-        if (lv_screen_active() == launcher) break;
-        nfound = 0; collect(lv_screen_active(), &lv_button_class);
-        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);   // вложенный экран: первая кнопка - "назад"
-        pump(25);
-    }
+    exit_to_launcher(launcher, 8);
 }
 
 // Клавиатура: открывается при фокусе, закрывается нажатием вне неё и поля, снова открывается по нажатию на поле.
@@ -228,13 +237,7 @@ static void keyboard_flow(lv_obj_t *launcher)
     CHECK(sys_keyboard_visible(), "real tap on input opens keyboard again");
 
     sys_keyboard_hide();
-    for (int k = 0; k < 8 && lv_screen_active() != launcher; k++) {
-        swipe_right();
-        if (lv_screen_active() == launcher) break;
-        nfound = 0; collect(lv_screen_active(), &lv_button_class);
-        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);   // вложенный экран: первая кнопка - "назад"
-        pump(25);
-    }
+    exit_to_launcher(launcher, 8);
     printf("keyboard flow done\n");
 }
 
@@ -412,13 +415,7 @@ int main(void)
             pump(25);
         }
         // вернуться в лаунчер, если приложение ещё открыто
-        for (int k = 0; k < 6 && lv_screen_active() != launcher; k++) {
-        swipe_right();
-        if (lv_screen_active() == launcher) break;
-        nfound = 0; collect(lv_screen_active(), &lv_button_class);
-        if (nfound) lv_obj_send_event(found[0], LV_EVENT_CLICKED, NULL);   // вложенный экран: первая кнопка - "назад"
-        pump(25);
-    }
+        exit_to_launcher(launcher, 6);
         printf("%d clicks\n", app_clicks);
     }
     printf("total clicks: %d\n", clicks);

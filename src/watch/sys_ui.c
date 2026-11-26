@@ -339,10 +339,14 @@ void sys_confirm(const char *title, const char *msg, sys_confirm_cb cb, void *ud
 }
 
 // ---------- каркас экрана ----------
-// Свайп вправо по главному экрану приложения - выход (на часах нет кнопки "назад" на корневом экране).
+// Свайп вправо - "назад": на главном экране приложения это выход, на вложенном - возврат на предыдущий экран
+// (кнопка "назад" на вложенных экранах остаётся).
 static void swipe_back_cb(lv_event_t *e)
 {
     lv_indev_t *in = lv_indev_active();
+    // Жест начался на ползунке/дуге (громкость, яркость): это перетаскивание значения, а не «назад».
+    lv_obj_t *origin = lv_event_get_target_obj(e);
+    if (origin && (lv_obj_check_type(origin, &lv_slider_class) || lv_obj_check_type(origin, &lv_arc_class))) return;
     if (in && lv_indev_get_gesture_dir(in) == LV_DIR_RIGHT) {
         lv_indev_wait_release(in);          // свайп не должен ещё и нажать кнопку, над которой закончился
         lv_event_cb_t cb = lv_event_get_user_data(e);
@@ -516,6 +520,7 @@ static lv_obj_t *screen_build(const char *title, lv_event_cb_t back_cb, lv_obj_t
         lv_obj_set_height(bar, 110);
         lv_obj_t *back = ws_round_button(bar, 56, LV_SYMBOL_LEFT, WS_CARD, 0xFFFFFF, NULL, back_cb, NULL);
         lv_obj_align(back, LV_ALIGN_TOP_LEFT, 24, 29);   // ниже общей строки состояния
+        if (back_cb) lv_obj_add_event_cb(scr, swipe_back_cb, LV_EVENT_GESTURE, back_cb);   // user_data не ставим: sys_screen_exit() работает только для главных экранов
         lv_obj_t *t = lv_label_create(bar);
         lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
         lv_obj_set_width(t, 220);
