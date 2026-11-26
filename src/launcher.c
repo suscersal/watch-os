@@ -235,7 +235,10 @@ static void build_grid(void)
             if (img) {   // готовая круглая иконка (assets/icons): кружок и глиф уже внутри картинки
                 // убираем стили темы: градиент, кромка и анимация нажатия перерисовывали круг при каждом касании
                 lv_obj_remove_style_all(btn);
+                // remove_style_all стирает и локальные стили x/y/width/height (set_pos/set_size - это стили),
+                // поэтому позицию и размер задаём заново, иначе все иконки сваливаются в (0,0)
                 lv_obj_set_size(btn, ICON, ICON);
+                lv_obj_set_pos(btn, x0 + c * PITCH_X, y);
                 lv_obj_t *im = lv_image_create(btn);
                 lv_image_set_src(im, img);
                 lv_obj_center(im);
