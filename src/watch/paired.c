@@ -78,6 +78,13 @@ bool paired_info(int i, char *name, size_t name_n)
     return true;
 }
 
+bool paired_id(int i, char *out, size_t n)
+{
+    if (i < 0 || i >= g_n || !out || n < 7) return false;
+    to_hex(g_dev[i].hash, 3, out);
+    return true;
+}
+
 static void hash_token(const uint8_t t[PAIRED_TOKEN_LEN], uint8_t out[32])
 {
     sha256_ctx c;

@@ -1,6 +1,7 @@
 #include "settings_app.h"
 #include "clock.h"
 #include "colorgrid_ui.h"
+#include "paired_menu.h"
 #include "pairing.h"
 #include "plat.h"
 #include "settings.h"
@@ -437,6 +438,13 @@ static void open_notify_cb(lv_event_t *e)
     push(g_main_scr, scr);
 }
 
+// ---------- сопряжённые телефоны (сохранённые токены) ----------
+static void open_paired_cb(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    paired_menu_open(lv_screen_active());     // "назад" вернёт на этот же экран настроек
+}
+
 // ---------- главный экран ----------
 void settings_open(lv_obj_t *launcher)
 {
@@ -448,5 +456,6 @@ void settings_open(lv_obj_t *launcher)
     button(body, LV_SYMBOL_REFRESH "  Time zone", 0x14B8A6, open_tz_cb, NULL);
     button(body, LV_SYMBOL_EDIT "  API key", 0x8B5CF6, open_key_cb, NULL);
     button(body, LV_SYMBOL_BELL "  Notifications", 0x22C55E, open_notify_cb, NULL);
+    button(body, LV_SYMBOL_LIST "  Paired phones", 0x0EA5E9, open_paired_cb, NULL);
     lv_screen_load_anim(g_main_scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);   // лаунчер не удаляем
 }

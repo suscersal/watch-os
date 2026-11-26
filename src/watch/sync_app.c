@@ -1,5 +1,6 @@
 #include "sync_app.h"
 #include "paired.h"
+#include "paired_menu.h"
 #include "pairing.h"
 #include "photos.h"
 #include "plat.h"
@@ -10,7 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static lv_obj_t *g_launcher, *scr, *status_lbl, *list_box;
+static lv_obj_t *g_launcher, *scr, *status_lbl, *pair_lbl;
 static int       got_photos;
 
 static void set_status(const char *t, uint32_t color)
@@ -21,48 +22,23 @@ static void set_status(const char *t, uint32_t color)
 }
 
 static lv_obj_t *add_label(lv_obj_t *body, const char *text, uint32_t color, const lv_font_t *font);
-static void rebuild_list(void);
 
-static void rebuild_async(void *ud) { LV_UNUSED(ud); rebuild_list(); }
-
-// Забыть сопряжённый телефон: его токен перестаёт работать, дальше вход только по коду с этого экрана.
-static void forget_cb(lv_event_t *e)
+// Кнопка меню сохранённых токенов; в подписи число сопряжённых телефонов.
+static void refresh_pair_btn(void)
 {
-    int idx = (int)(intptr_t)lv_event_get_user_data(e);
-    if (paired_remove(idx)) sys_toast("Device forgotten");
-    sync_net_notify_apply();                 // нет сопряжённых и уведомления выключены - порт закроется при выходе
-    lv_async_call(rebuild_async, NULL);      // перестроить после выхода из обработчика кнопки
+    if (!pair_lbl) return;
+    char t[40];
+    snprintf(t, sizeof t, LV_SYMBOL_LIST "  Paired phones (%d)", paired_count());
+    lv_label_set_text(pair_lbl, t);
 }
 
-static void rebuild_list(void)
+static void pair_btn_cb(lv_event_t *e)
 {
-    if (!list_box) return;
-    lv_obj_clean(list_box);
-    int n = paired_count();
-    add_label(list_box, n ? "Paired phones (connect without a code):" : "No paired phones. Enter the code in the app once, and next time no code is needed.",
-              0x9CA3AF, WATCH_FONT_SMALL);
-    for (int i = 0; i < n; i++) {
-        char name[PAIRED_NAME_MAX + 1];
-        if (!paired_info(i, name, sizeof name)) break;
-        lv_obj_t *row = lv_obj_create(list_box);
-        lv_obj_remove_style_all(row);
-        lv_obj_set_size(row, lv_pct(100), 44);
-        lv_obj_t *l = lv_label_create(row);
-        lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
-        lv_obj_set_width(l, lv_pct(60));
-        lv_label_set_text(l, name);
-        lv_obj_set_style_text_color(l, lv_color_white(), 0);
-        lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
-        lv_obj_t *b = lv_button_create(row);
-        lv_obj_set_size(b, LV_SIZE_CONTENT, 36);
-        lv_obj_set_style_bg_color(b, lv_color_hex(0xEF4444), 0);
-        lv_obj_align(b, LV_ALIGN_RIGHT_MID, 0, 0);
-        lv_obj_t *bl = lv_label_create(b);
-        lv_label_set_text(bl, "Forget");
-        lv_obj_center(bl);
-        lv_obj_add_event_cb(b, forget_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
-    }
+    LV_UNUSED(e);
+    paired_menu_open(scr);
 }
+
+static void loaded_cb(lv_event_t *e) { LV_UNUSED(e); refresh_pair_btn(); }   // вернулись из меню: число могло измениться
 
 static void on_event(sync_event_t ev, void *ud)
 {
@@ -79,7 +55,7 @@ static void on_event(sync_event_t ev, void *ud)
         set_status(t, 0x22C55E);
         break;
     case SYNC_EV_AUDIO:         sys_toast("Audio received"); break;
-    case SYNC_EV_PAIRED:        sys_toast("Phone paired"); rebuild_list(); break;
+    case SYNC_EV_PAIRED:        sys_toast("Phone paired"); refresh_pair_btn(); break;
     case SYNC_EV_PHOTO_DELETED: sys_toast("Photo removed by phone"); break;
     case SYNC_EV_MESSAGE:       break;     // уведомление уже лежит в messages; на экране синхронизации ничего не меняем
     case SYNC_EV_DISCONNECTED:
@@ -96,7 +72,7 @@ static void gone_cb(lv_event_t *e)
     LV_UNUSED(e);
     sync_rx_set_event_cb(NULL, NULL);
     sync_net_stop();
-    scr = status_lbl = list_box = NULL;
+    scr = status_lbl = pair_lbl = NULL;
 }
 
 static void back_cb(lv_event_t *e)
@@ -126,6 +102,17 @@ void sync_app_open(lv_obj_t *launcher)
     lv_obj_add_event_cb(scr, gone_cb, LV_EVENT_DELETE, NULL);
 
     add_label(body, "First time: enter this address and code in the phone app. After that the phone connects by itself.", 0x9CA3AF, NULL);
+
+    lv_obj_t *pb = lv_button_create(body);
+    lv_obj_set_size(pb, lv_pct(100), 48);
+    lv_obj_set_style_radius(pb, 14, 0);
+    lv_obj_set_style_shadow_width(pb, 0, 0);
+    lv_obj_set_style_bg_color(pb, lv_color_hex(0x0EA5E9), 0);
+    pair_lbl = lv_label_create(pb);
+    lv_obj_center(pair_lbl);
+    lv_obj_add_event_cb(pb, pair_btn_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(scr, loaded_cb, LV_EVENT_SCREEN_LOADED, NULL);
+    refresh_pair_btn();
 
     if (!sync_net_start(0)) {
         add_label(body, "Cannot open the sync port.", 0xEF4444, NULL);
@@ -157,11 +144,5 @@ void sync_app_open(lv_obj_t *launcher)
         status_lbl = add_label(body, "Waiting for phone", 0x9CA3AF, NULL);
         sync_rx_set_event_cb(on_event, NULL);
     }
-    list_box = lv_obj_create(body);                    // сопряжённые телефоны: токены можно забыть
-    lv_obj_remove_style_all(list_box);
-    lv_obj_set_size(list_box, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(list_box, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(list_box, 6, 0);
-    rebuild_list();
     lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);   // лаунчер не удаляем
 }

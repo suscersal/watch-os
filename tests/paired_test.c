@@ -39,6 +39,8 @@ int main(void)
       CHECK(txt && !strstr(txt, "\"token\""), "file holds hashes only");
       free(txt); }
 
+    { char id0[16], id1[16];
+      CHECK(paired_id(0, id0, sizeof id0) && paired_id(1, id1, sizeof id1) && strlen(id0) == 6 && strcmp(id0, id1) != 0, "short ids differ"); }
     CHECK(paired_remove(0), "forget Galaxy");
     CHECK(!paired_verify(b) && paired_verify(a2), "forgotten token rejected");
     CHECK(!paired_remove(5), "bad index ignored");

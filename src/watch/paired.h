@@ -13,6 +13,7 @@
 void paired_init(const char *data_dir);                  // загрузить список; без вызова список пустой и не сохраняется
 int  paired_count(void);
 bool paired_info(int i, char *name, size_t name_n);      // имя i-го устройства (0 - самое старое)
+bool paired_id(int i, char *out, size_t n);              // короткий отпечаток токена (6 hex), чтобы отличать одинаковые имена
 bool paired_add(const char *name, uint8_t token_out[PAIRED_TOKEN_LEN]);   // новый токен; то же имя заменяет прежнюю запись
 bool paired_verify(const uint8_t token[PAIRED_TOKEN_LEN]);                // сравнение за постоянное время
 bool paired_remove(int i);
