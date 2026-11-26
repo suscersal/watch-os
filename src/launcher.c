@@ -14,6 +14,7 @@
 #include "watch/music_app.h"
 #include "watch/recorder_app.h"
 #include "watch/auth.h"
+#include "watch/paired.h"
 #include "watch/lock_screen.h"
 #include "watch/photos.h"
 #include "watch/sys_ui.h"
@@ -130,6 +131,7 @@ void watch_launcher_create(void)
     printf("LTRACE 3 ok: settings_init\n");
     auth_init(WATCH_ROOT "data");
     printf("LTRACE 4 ok: auth_init\n");
+    paired_init(WATCH_ROOT "data");          // сопряжённые телефоны (вход без кода по токену)
     storage_init(WATCH_ROOT "data");         // хранилище приложений; папка data/ приложениям недоступна
     printf("LTRACE 5 ok: storage_init\n");
     power_init(WATCH_ROOT "data");
@@ -148,7 +150,7 @@ void watch_launcher_create(void)
     printf("LTRACE 12 ok: lock_screen_init\n");
     buttons_init(launcher);     // кнопки корпуса
     printf("LTRACE 13 ok: buttons_init\n");
-    sync_net_notify_apply();    // если включены уведомления с телефона - начать слушать порт
+    sync_net_notify_apply();    // если включены уведомления или есть сопряжённые телефоны - начать слушать порт
     printf("LTRACE 14 ok: sync_net_notify_apply\n");
 }
 

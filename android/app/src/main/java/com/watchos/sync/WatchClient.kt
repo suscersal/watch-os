@@ -22,6 +22,9 @@ object Proto {
     const val VERSION = 1
     const val T_HELLO = 0x01
     const val T_TIME = 0x02
+    const val T_HELLO_TOKEN = 0x03
+    const val T_PAIR_REQ = 0x04
+    const val TOKEN_LEN = 16
     const val T_PHOTO_BEGIN = 0x10
     const val T_PHOTO_DATA = 0x11
     const val T_PHOTO_END = 0x12
@@ -39,6 +42,7 @@ object Proto {
     const val MSG_TEXT_MAX = 256
     const val R_OK = 0x80
     const val R_HELLO_OK = 0x81
+    const val R_TOKEN = 0x82
     const val R_ERR = 0x8F
     const val R_LIST = 0x91
     const val CHUNK = 16384
@@ -124,7 +128,29 @@ class WatchClient(private val host: String, private val port: Int) : Closeable {
         require(code.length == 6 && code.all { it in '0'..'9' }) { "code must be 6 digits" }
         val name = deviceName.toByteArray(Charsets.UTF_8).let { if (it.size > 32) it.copyOf(32) else it }
         send(Proto.T_HELLO, byteArrayOf(Proto.VERSION.toByte()) + code.toByteArray(Charsets.US_ASCII) + name)
-        val (_, p) = reply()
+        return readInfo(reply().second)
+    }
+
+    /** Вход без кода по постоянному токену, выданному раньше (см. requestToken). Не работает, пока часы заблокированы PIN. */
+    fun helloToken(token: ByteArray, deviceName: String = "phone"): WatchInfo {
+        require(token.size == Proto.TOKEN_LEN) { "bad token" }
+        val name = deviceName.toByteArray(Charsets.UTF_8).let { if (it.size > 32) it.copyOf(32) else it }
+        send(Proto.T_HELLO_TOKEN, byteArrayOf(Proto.VERSION.toByte()) + token + name)
+        return readInfo(reply().second)
+    }
+
+    /**
+     * Просит у часов постоянный токен. Вызывать сразу после hello(код с экрана Sync): часы выдают токен только в таком сеансе.
+     * Часы хранят только хеш токена, токен нужно сохранить у себя. Старая прошивка или постоянный код уведомлений отвечают ошибкой.
+     */
+    fun requestToken(): ByteArray {
+        send(Proto.T_PAIR_REQ)
+        val (type, p) = reply()
+        if (type != Proto.R_TOKEN || p.size != Proto.TOKEN_LEN) throw WatchException("bad token reply")
+        return p
+    }
+
+    private fun readInfo(p: ByteArray): WatchInfo {
         val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
         b.get()                                   // версия протокола
         val count = b.short.toInt() and 0xFFFF

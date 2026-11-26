@@ -6,6 +6,7 @@
 #include "audio.h"
 #include "fs.h"
 #include "music_app.h"
+#include "paired.h"
 #include "photos.h"
 #include "sync_proto.h"
 #include <stdio.h>
@@ -20,6 +21,8 @@ typedef enum { SCOPE_NONE, SCOPE_FULL, SCOPE_MSG } scope_t;
 typedef struct {
     bool open, authed;
     scope_t scope;
+    bool via_code;               // вход по одноразовому коду с экрана Sync (только так можно получить токен)
+    char name[PAIRED_NAME_MAX + 1];   // имя устройства из HELLO
     char code[SYNC_CODE_LEN + 1];
     int  auth_fails;
     sync_io_t io;
@@ -125,6 +128,29 @@ static bool code_match(const char *expect)
     return diff == 0;
 }
 
+static void read_name(size_t off)
+{
+    size_t n = S.len > off ? S.len - off : 0;
+    if (n > PAIRED_NAME_MAX) n = PAIRED_NAME_MAX;
+    size_t k = 0;
+    for (size_t i = 0; i < n; i++) { uint8_t c = S.payload[off + i]; if (c >= 0x20 && c != 0x7F) S.name[k++] = (char)c; }
+    S.name[k] = '\0';
+}
+
+static void hello_ok(bool full)
+{
+    S.authed = true;
+    S.scope = full ? SCOPE_FULL : SCOPE_MSG;
+    uint8_t p[9];
+    p[0] = SYNC_PROTO_VERSION;
+    size_t cnt = full ? photos_count() : 0;         // сопряжение для уведомлений о фото ничего не знает
+    p[1] = (uint8_t)cnt; p[2] = (uint8_t)(cnt >> 8);
+    p[3] = (uint8_t)PHOTOS_MAX; p[4] = (uint8_t)(PHOTOS_MAX >> 8);
+    wr32(p + 5, PHOTO_FULL_MAX_BYTES);
+    send_frame(SYNC_T_HELLO_OK, p, sizeof p);
+    emit(SYNC_EV_AUTH_OK);
+}
+
 static void on_hello(bool locked)
 {
     if (S.len < 1 + SYNC_CODE_LEN || S.payload[0] != SYNC_PROTO_VERSION) { send_err(SYNC_T_HELLO, SYNC_E_BAD_FRAME); return; }
@@ -137,16 +163,36 @@ static void on_hello(bool locked)
         emit(SYNC_EV_AUTH_FAIL);
         return;
     }
-    S.authed = true;
-    S.scope = full ? SCOPE_FULL : SCOPE_MSG;
-    uint8_t p[9];
-    p[0] = SYNC_PROTO_VERSION;
-    size_t cnt = full ? photos_count() : 0;         // сопряжение для уведомлений о фото ничего не знает
-    p[1] = (uint8_t)cnt; p[2] = (uint8_t)(cnt >> 8);
-    p[3] = (uint8_t)PHOTOS_MAX; p[4] = (uint8_t)(PHOTOS_MAX >> 8);
-    wr32(p + 5, PHOTO_FULL_MAX_BYTES);
-    send_frame(SYNC_T_HELLO_OK, p, sizeof p);
-    emit(SYNC_EV_AUTH_OK);
+    read_name(1 + SYNC_CODE_LEN);
+    S.via_code = full;
+    hello_ok(full);
+}
+
+// HELLO_TOKEN: proto u8, token[16], имя. Токен даёт полный доступ, но не при блокировке PIN (как и одноразовый код).
+static void on_hello_token(bool locked)
+{
+    if (S.len < 1 + PAIRED_TOKEN_LEN || S.payload[0] != SYNC_PROTO_VERSION) { send_err(SYNC_T_HELLO_TOKEN, SYNC_E_BAD_FRAME); return; }
+    if (locked) { send_err(SYNC_T_HELLO_TOKEN, SYNC_E_LOCKED); S.auth_fails = MAX_AUTH_FAILS; return; }
+    if (!paired_verify(S.payload + 1)) {
+        S.auth_fails++;
+        send_err(SYNC_T_HELLO_TOKEN, SYNC_E_AUTH);
+        emit(SYNC_EV_AUTH_FAIL);
+        return;
+    }
+    read_name(1 + PAIRED_TOKEN_LEN);
+    S.via_code = false;
+    hello_ok(true);
+}
+
+// PAIR_REQ: выдать постоянный токен. Только в сессии с одноразовым кодом, то есть пока на часах открыт экран Sync.
+static void on_pair_req(void)
+{
+    if (!S.via_code) { send_err(SYNC_T_PAIR_REQ, SYNC_E_SCOPE); return; }
+    uint8_t tok[PAIRED_TOKEN_LEN];
+    if (!paired_add(S.name, tok)) { send_err(SYNC_T_PAIR_REQ, SYNC_E_STORAGE); return; }
+    send_frame(SYNC_T_TOKEN, tok, sizeof tok);
+    memset(tok, 0, sizeof tok);
+    emit(SYNC_EV_PAIRED);
 }
 
 static void on_time(void)
@@ -291,6 +337,11 @@ static bool on_frame(void)
         if (S.auth_fails >= MAX_AUTH_FAILS) { g_why = locked ? "watch is locked" : "3 wrong codes"; return false; }
         return true;
     }
+    if (S.type == SYNC_T_HELLO_TOKEN) {
+        on_hello_token(locked);
+        if (S.auth_fails >= MAX_AUTH_FAILS) { g_why = locked ? "watch is locked" : "3 wrong tokens"; return false; }
+        return true;
+    }
     if (locked && S.scope != SCOPE_MSG) { send_err(S.type, SYNC_E_LOCKED); g_why = "watch is locked"; return false; }
     if (!S.authed) { send_err(S.type, SYNC_E_STATE); g_why = "frame before HELLO"; return false; }
     if (S.scope == SCOPE_MSG && S.type != SYNC_T_TIME && S.type != SYNC_T_MESSAGE) {
@@ -299,6 +350,7 @@ static bool on_frame(void)
     }
     switch (S.type) {
     case SYNC_T_TIME:         on_time(); break;
+    case SYNC_T_PAIR_REQ:     on_pair_req(); break;
     case SYNC_T_MESSAGE:      on_message(); break;
     case SYNC_T_AUDIO_BEGIN:  on_audio_begin(); break;
     case SYNC_T_AUDIO_COVER:  on_audio_cover(); break;

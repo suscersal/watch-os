@@ -1,5 +1,6 @@
 #include "sync_net.h"
 #include "lvgl_inc.h"
+#include "paired.h"
 #include "plat.h"
 #include "settings.h"
 #include "sync_proto.h"
@@ -22,7 +23,7 @@ static uint16_t    g_port;
 static char        g_code[SYNC_CODE_LEN + 1];
 static lv_timer_t *g_timer;
 static uint32_t    g_cli_last;                    // тик последней активности клиента
-static bool        g_want_sync, g_want_notify;   // зачем поднят сервер: экран Sync и/или уведомления с телефона
+static bool        g_want_sync, g_want_notify, g_want_paired;   // зачем поднят сервер: экран Sync, уведомления с телефона и/или есть сопряжённые телефоны (автоподключение по токену)
 
 static void set_nonblock(int fd) { fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK); }
 
@@ -140,15 +141,17 @@ void sync_net_stop(void)
     g_want_sync = false;
     memset(g_code, 0, sizeof g_code);        // одноразовый код больше не действует
     g_drop[0] = '\0';
-    drop_client();                           // сессия с этим кодом закрывается; уведомления переподключатся сами
-    if (!g_want_notify) server_close();
+    drop_client();                           // сессия с этим кодом закрывается; уведомления и токены переподключатся сами
+    g_want_paired = paired_count() > 0;      // телефон мог получить токен, пока был открыт экран Sync
+    if (!g_want_notify && !g_want_paired) server_close();
 }
 
 bool sync_net_notify_apply(void)
 {
+    g_want_paired = paired_count() > 0;
     g_want_notify = settings_notify_on() && settings_notify_code()[0];
     sync_rx_set_notify_code(g_want_notify ? settings_notify_code() : NULL);
-    if (g_want_notify) return server_open(0);
+    if (g_want_notify || g_want_paired) return server_open(0);
     if (!g_want_sync) server_close();
     return true;
 }

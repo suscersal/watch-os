@@ -20,8 +20,16 @@ import android.widget.TextView
 import java.util.TimeZone
 import java.util.concurrent.Executors
 
+private fun toHex(b: ByteArray) = b.joinToString("") { "%02x".format(it) }
+
+private fun fromHex(s: String?): ByteArray? {
+    if (s == null || s.length != Proto.TOKEN_LEN * 2) return null
+    return try { ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() } } catch (_: NumberFormatException) { null }
+}
+
 /**
- * Простое приложение синхронизации: вводите адрес и код с экрана Sync на часах, выбираете фото и отправляете.
+ * Простое приложение синхронизации: один раз вводите адрес и код с экрана Sync на часах, дальше телефон подключается сам
+ * (часы выдают постоянный токен, он хранится в SharedPreferences "watch"). Выбираете фото и отправляете.
  * Время часов выставляется при каждом подключении.
  */
 class MainActivity : Activity() {
@@ -47,7 +55,7 @@ class MainActivity : Activity() {
         fun text(t: String, size: Float, color: Int = Color.DKGRAY) = TextView(this).apply { this.text = t; textSize = size; setTextColor(color) }
 
         root.addView(text("Watch Sync", 26f, Color.BLACK))
-        root.addView(text("On the watch open Sync. It shows an address and a 6-digit code.", 14f))
+        root.addView(text("First time: on the watch open Sync and enter the address and 6-digit code here. After that the phone connects by itself, no code needed.", 14f))
 
         hostEdit = EditText(this).apply {
             hint = "Watch address, e.g. 192.168.0.5"
@@ -60,7 +68,7 @@ class MainActivity : Activity() {
             setText(prefs.getString("port", "8765"))
         }
         codeEdit = EditText(this).apply {
-            hint = "Code from the watch"
+            hint = "Code from the watch (empty once paired)"
             inputType = InputType.TYPE_CLASS_NUMBER
         }
         root.addView(hostEdit)
@@ -73,6 +81,7 @@ class MainActivity : Activity() {
         root.addView(pickBtn)
         root.addView(audioBtn)
         root.addView(timeBtn)
+        root.addView(Button(this).apply { text = "Forget this watch"; setOnClickListener { forgetWatch() } })
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100; visibility = View.INVISIBLE }
         root.addView(progress)
@@ -89,9 +98,23 @@ class MainActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(root) })
         handleLink(intent)
         showNotifyStatus()
+        showPairState()
     }
 
     private lateinit var notifyStatus: TextView
+
+    private fun savedToken(): ByteArray? = fromHex(getSharedPreferences("watch", Context.MODE_PRIVATE).getString("token", null))
+
+    private fun showPairState() {
+        val host = getSharedPreferences("watch", Context.MODE_PRIVATE).getString("host", "") ?: ""
+        if (savedToken() != null && host.isNotEmpty()) status.text = "Paired with $host. No code needed: just press a button."
+    }
+
+    /** Токен удаляется на телефоне; на часах его можно забыть в Sync (кнопка Forget), тогда он перестаёт работать совсем. */
+    private fun forgetWatch() {
+        getSharedPreferences("watch", Context.MODE_PRIVATE).edit().remove("token").apply()
+        say("Forgotten on this phone. To pair again open Sync on the watch and enter the code. To also remove it on the watch press Forget there.")
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -200,7 +223,8 @@ class MainActivity : Activity() {
             host = host.substringBefore(":")
         }
         val code = codeEdit.text.toString().trim()
-        if (host.isEmpty() || code.length != 6) { say("Enter the watch address and the 6-digit code."); return }
+        val saved = if (code.isEmpty()) savedToken() else null          // введён код - входим по коду и получаем новый токен
+        if (host.isEmpty() || (saved == null && code.length != 6)) { say("Enter the watch address and the 6-digit code (first time only)."); return }
         getSharedPreferences("watch", Context.MODE_PRIVATE).edit().putString("host", host).putString("port", port.toString()).apply()
 
         busy(true)
@@ -223,7 +247,17 @@ class MainActivity : Activity() {
                     say("Connecting to $host:$port ...")
                     w.connect()
                     step = "hello"
-                    val info = w.hello(code, android.os.Build.MODEL ?: "phone")
+                    val model = android.os.Build.MODEL ?: "phone"
+                    val info = if (saved != null) w.helloToken(saved, model) else w.hello(code, model)
+                    if (saved == null) {                    // вошли по коду: просим постоянный токен, чтобы больше код не вводить
+                        step = "pair"
+                        try {
+                            val t = w.requestToken()
+                            getSharedPreferences("watch", Context.MODE_PRIVATE).edit().putString("token", toHex(t)).apply()
+                            runOnUiThread { codeEdit.setText("") }   // код одноразовый, больше не нужен
+                        } catch (_: WatchException) { /* старая прошивка или постоянный код уведомлений: работаем с кодом, как раньше */ }
+                        step = "hello"
+                    }
                     say("Paired. The watch has ${info.photoCount} of ${info.maxPhotos} photos.")
                     val now = System.currentTimeMillis()
                     step = "time"
@@ -263,7 +297,13 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 val what = e.message ?: e.javaClass.simpleName
-                val hint = if (e is java.io.EOFException) " (the watch closed the connection: reopen Sync on the watch and enter the new code)" else ""
+                var hint = if (e is java.io.EOFException) " (the watch closed the connection: reopen Sync on the watch and enter the new code)" else ""
+                if (saved != null && e is WatchException && e.message == Proto.errorText(2)) {
+                    getSharedPreferences("watch", Context.MODE_PRIVATE).edit().remove("token").apply()     // часы этот телефон забыли
+                    hint = " (the watch forgot this phone: open Sync on the watch and enter the new code)"
+                } else if (saved != null && step == "connect") {
+                    hint = " (is the watch awake and on Wi-Fi? If its address changed, enter the new one from Sync)"
+                }
                 say("Error at $step: $what$hint")
             } finally {
                 tracks.forEach { it.file.delete() }

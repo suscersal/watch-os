@@ -101,3 +101,24 @@ add_executable(watch_colorcode_test EXCLUDE_FROM_ALL tests/colorcode_test.c src/
 target_compile_options(watch_colorcode_test PRIVATE -g -Wall -Wextra -fsanitize=address,undefined)
 target_link_options(watch_colorcode_test PRIVATE -fsanitize=address,undefined)
 add_custom_target(colorcode_test COMMAND watch_colorcode_test DEPENDS watch_colorcode_test VERBATIM)
+
+# Постоянные токены сопряжения (paired.c): без LVGL, с AddressSanitizer/UBSan. Тест пишет paired_dir/ в текущей папке:
+#   cmake --build build --target paired_test
+add_executable(watch_paired_test EXCLUDE_FROM_ALL tests/paired_test.c src/watch/paired.c src/watch/fs_posix.c src/watch/sha256.c ${CJSON_SRC})
+target_compile_options(watch_paired_test PRIVATE -g -Wall -Wextra -fsanitize=address,undefined)
+target_link_options(watch_paired_test PRIVATE -fsanitize=address,undefined)
+target_include_directories(watch_paired_test PRIVATE ${PROJECT_SOURCE_DIR}/src ${CJSON_INC})
+target_link_libraries(watch_paired_test ${CJSON_LIB} m)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/paired_test_run)
+add_custom_target(paired_test COMMAND $<TARGET_FILE:watch_paired_test> DEPENDS watch_paired_test WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/paired_test_run VERBATIM)
+
+# Рукопожатие с постоянным токеном (sync_rx.c + paired.c, остальное заглушки), с AddressSanitizer/UBSan:
+#   cmake --build build --target pairing_rx_test
+add_executable(watch_pairing_rx_test EXCLUDE_FROM_ALL tests/pairing_rx_test.c src/watch/sync_rx.c src/watch/paired.c src/watch/fs_posix.c src/watch/sha256.c src/watch/crc32.c ${CJSON_SRC})
+target_compile_definitions(watch_pairing_rx_test PRIVATE LV_CONF_INCLUDE_SIMPLE)
+target_compile_options(watch_pairing_rx_test PRIVATE -g -fsanitize=address,undefined)
+target_link_options(watch_pairing_rx_test PRIVATE -fsanitize=address,undefined)
+target_include_directories(watch_pairing_rx_test PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src ${CJSON_INC} $<TARGET_PROPERTY:lvgl,INTERFACE_INCLUDE_DIRECTORIES>)
+target_link_libraries(watch_pairing_rx_test ${CJSON_LIB} m)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/pairing_rx_test_run)
+add_custom_target(pairing_rx_test COMMAND $<TARGET_FILE:watch_pairing_rx_test> DEPENDS watch_pairing_rx_test WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/pairing_rx_test_run VERBATIM)

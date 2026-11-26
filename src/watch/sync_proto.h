@@ -13,6 +13,8 @@
 // телефон -> часы
 #define SYNC_T_HELLO         0x01     // proto u8, code[6] ASCII, имя устройства (utf8, до 32 байт)
 #define SYNC_T_TIME          0x02     // epoch i64, tz_min i16
+#define SYNC_T_HELLO_TOKEN   0x03     // вход без кода: proto u8, token[16], имя устройства (utf8, до 32 байт); токен выдан ранее (PAIR_REQ)
+#define SYNC_T_PAIR_REQ      0x04     // после HELLO с одноразовым кодом: попросить постоянный токен; ответ TOKEN
 #define SYNC_T_PHOTO_BEGIN   0x10     // id u32, taken u32, thumb_size u32, full_size u32, crc32 u32 (от миниатюры+полного)
 #define SYNC_T_PHOTO_DATA    0x11     // сырые байты: сначала миниатюра, потом полный кадр
 #define SYNC_T_PHOTO_END     0x12
@@ -28,6 +30,7 @@
 
 // часы -> телефон
 #define SYNC_T_OK            0x80     // req u8, status u8
+#define SYNC_T_TOKEN         0x82     // token[16]: постоянный токен этого телефона (показывается один раз)
 #define SYNC_T_HELLO_OK      0x81     // proto u8, count u16, max_photos u16, max_full_bytes u32
 #define SYNC_T_LIST          0x91     // count u16, id u32 * count (новые первыми)
 #define SYNC_T_ERR           0x8F     // req u8, code u8
