@@ -59,7 +59,7 @@ object FlashPlan {
         problem(img)?.let { throw FlashException(it) }
         if (!keepData) return listOf(FlashRegion(0, img))
         val keep = parseTable(img).filter { it.label == "nvs" || it.label == "storage" }
-        if (keep.none { it.label == "storage" }) throw FlashException("the image has no storage partition, so data cannot be kept")
+        if (keep.none { it.label == "storage" }) throw FlashException(tr("the image has no storage partition, so data cannot be kept", "в образе нет раздела storage, данные сохранить нельзя"))
         val skip = keep.map { Pair(it.offset, minOf(it.offset + it.size, img.size)) }.sortedBy { it.first }
         val out = ArrayList<FlashRegion>()
         fun add(from: Int, to: Int) {
@@ -224,7 +224,7 @@ class EspFlasher(private val port: FlashPort, private val log: (String) -> Unit 
             rpos = 0; rlen = 0; cur.reset(); inFrame = false; esc = false
             if (trySync()) { ok = true; break }
         }
-        if (!ok) throw FlashException("The watch does not answer. Hold the BOOT button while plugging the USB cable, then try again.")
+        if (!ok) throw FlashException(tr("The watch does not answer. Hold the BOOT button while plugging the USB cable, then try again.", "Часы не отвечают. Зажмите кнопку BOOT при подключении USB-кабеля и повторите."))
         try {
             val magic = command(OP_READ_REG, le32(0x40001000)).value
             log("Chip id 0x%x%s".format(magic, if (magic == 9) " (ESP32-S3)" else " (unexpected)"))

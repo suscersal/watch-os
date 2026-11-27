@@ -56,7 +56,7 @@ object PhotoPrep {
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
         var bmp = cr.openInputStream(uri)!!.use { BitmapFactory.decodeStream(it, null, opts) }
-            ?: throw IllegalArgumentException("cannot decode image")
+            ?: throw IllegalArgumentException(tr("cannot decode image", "не удалось открыть изображение"))
 
         // Ориентация из EXIF и время съёмки
         var taken = System.currentTimeMillis() / 1000

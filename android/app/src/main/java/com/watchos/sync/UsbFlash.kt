@@ -28,7 +28,7 @@ class UsbCdcPort(
         while (off < data.size) {
             val n = minOf(4096, data.size - off)
             val chunk = data.copyOfRange(off, off + n)
-            if (conn.bulkTransfer(epOut, chunk, n, 5000) < 0) throw FlashException("USB write failed (cable unplugged?)")
+            if (conn.bulkTransfer(epOut, chunk, n, 5000) < 0) throw FlashException(tr("USB write failed (cable unplugged?)", "ошибка записи по USB (кабель отключён?)"))
             off += n
         }
     }
@@ -82,7 +82,7 @@ object UsbFlash {
 
     fun open(ctx: Context, dev: UsbDevice): UsbCdcPort {
         val m = ctx.getSystemService(Context.USB_SERVICE) as UsbManager
-        val conn = m.openDevice(dev) ?: throw FlashException("Cannot open the USB device")
+        val conn = m.openDevice(dev) ?: throw FlashException(tr("Cannot open the USB device", "не удаётся открыть USB-устройство"))
         var ctl: UsbInterface? = null
         var dat: UsbInterface? = null
         var ein: UsbEndpoint? = null
@@ -102,7 +102,7 @@ object UsbFlash {
         val c = ctl; val d = dat; val ei = ein; val eo = eout
         if (c == null || d == null || ei == null || eo == null) {
             conn.close()
-            throw FlashException("The USB device has no serial interface")
+            throw FlashException(tr("The USB device has no serial interface", "у USB-устройства нет последовательного интерфейса"))
         }
         conn.claimInterface(c, true)
         conn.claimInterface(d, true)

@@ -54,18 +54,18 @@ object Proto {
     const val MAX_FRAME = 20000
 
     fun errorText(code: Int): String = when (code) {
-        1 -> "bad frame"
-        2 -> "wrong code"
-        3 -> "wrong state"
-        4 -> "too big"
-        5 -> "checksum mismatch"
-        6 -> "image format not supported by the watch"
-        7 -> "watch storage is full"
-        8 -> "not supported"
-        9 -> "watch is locked"
-        10 -> "not allowed with this code"
-        11 -> "battery too low: put the watch on the charger (needs 30%)"
-        else -> "error $code"
+        1 -> tr("bad frame", "повреждённый кадр")
+        2 -> tr("wrong code", "неверный код")
+        3 -> tr("wrong state", "неверное состояние")
+        4 -> tr("too big", "слишком большой")
+        5 -> tr("checksum mismatch", "контрольная сумма не совпала")
+        6 -> tr("image format not supported by the watch", "формат изображения не поддерживается часами")
+        7 -> tr("watch storage is full", "память часов заполнена")
+        8 -> tr("not supported", "не поддерживается")
+        9 -> tr("watch is locked", "часы заблокированы")
+        10 -> tr("not allowed with this code", "с этим кодом не разрешено")
+        11 -> tr("battery too low: put the watch on the charger (needs 30%)", "низкий заряд: поставьте часы на зарядку (нужно 30%)")
+        else -> tr("error $code", "ошибка $code")
     }
 }
 
@@ -294,7 +294,7 @@ class WatchClient(private val host: String, private val port: Int) : Closeable {
             try { reply() } catch (we: WatchException) { throw we } catch (_: Exception) { }     // причина обрыва, если часы успели её прислать
             throw e
         }
-        if (sent != size) throw WatchException("the file changed while sending")
+        if (sent != size) throw WatchException(tr("the file changed while sending", "файл изменился во время отправки"))
         send(Proto.T_FW_END)
         reply()
     }

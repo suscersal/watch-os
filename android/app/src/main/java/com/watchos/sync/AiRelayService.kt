@@ -31,10 +31,10 @@ class AiRelayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(NotificationChannel(CHANNEL, "AI relay", NotificationManager.IMPORTANCE_LOW))
+            .createNotificationChannel(NotificationChannel(CHANNEL, tr("AI relay", "Ретранслятор ИИ"), NotificationManager.IMPORTANCE_LOW))
         val n = Notification.Builder(this, CHANNEL)
-            .setContentTitle("Watch AI relay is running")
-            .setContentText("Passing watch requests to Watch AI (port ${Relay.PORT})")
+            .setContentTitle(tr("Watch AI relay is running", "Ретранслятор Watch AI работает"))
+            .setContentText(tr("Passing watch requests to Watch AI (port ${Relay.PORT})", "Запросы часов передаются в Watch AI (порт ${Relay.PORT})"))
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
             .build()

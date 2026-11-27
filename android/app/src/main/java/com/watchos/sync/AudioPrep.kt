@@ -106,7 +106,7 @@ object AudioPrep {
                 while (true) {
                     val r = ins.read(buf); if (r <= 0) break
                     total += r
-                    if (total > Proto.AUDIO_MAX_BYTES) throw WatchException("track is too long for the watch (max 24 MB)")
+                    if (total > Proto.AUDIO_MAX_BYTES) throw WatchException(tr("track is too long for the watch (max 24 MB)", "трек слишком длинный для часов (максимум 24 МБ)"))
                     o.write(buf, 0, r)
                 }
             }
@@ -131,7 +131,7 @@ object AudioPrep {
             val f = ex.getTrackFormat(i)
             if (f.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) { ex.selectTrack(i); fmt = f; break }
         }
-        if (fmt == null) { ex.release(); throw WatchException("no audio in this file") }
+        if (fmt == null) { ex.release(); throw WatchException(tr("no audio in this file", "в файле нет звука")) }
         val durationUs = if (fmt.containsKey(MediaFormat.KEY_DURATION)) fmt.getLong(MediaFormat.KEY_DURATION) else 0L
         val codec = MediaCodec.createDecoderByType(fmt.getString(MediaFormat.KEY_MIME)!!)
         codec.configure(fmt, null, null, 0)
@@ -152,7 +152,7 @@ object AudioPrep {
                 fun flush() {
                     if (pending.size() == 0) return
                     raf.write(pending.toByteArray()); written += pending.size(); pending.reset()
-                    if (written > Proto.AUDIO_MAX_BYTES) throw WatchException("track is too long for the watch (max 24 MB)")
+                    if (written > Proto.AUDIO_MAX_BYTES) throw WatchException(tr("track is too long for the watch (max 24 MB)", "трек слишком длинный для часов (максимум 24 МБ)"))
                 }
                 while (!outDone) {
                     if (!inDone) {
@@ -201,6 +201,6 @@ object AudioPrep {
             codec.release()
             ex.release()
         }
-        if (written < 2) throw WatchException("could not decode this file")
+        if (written < 2) throw WatchException(tr("could not decode this file", "не удалось декодировать файл"))
     }
 }
