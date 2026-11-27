@@ -11,6 +11,7 @@
 #include "timer_app.h"
 #include "calc_app.h"
 #include "security_app.h"
+#include "about_app.h"
 #include "gallery_app.h"
 #include "files_app.h"
 #include "messages_app.h"
@@ -148,8 +149,8 @@ static void reg_folder(const char *id, const char *name, uint32_t color)
 
 static void register_system_apps(void)
 {
-    reg_app("sys_messages", "Messages",    "mail",    0x22C55E, NULL, messages_open);
-    reg_app("sys_gallery",  "Gallery",     "image",   0xF97316, NULL, gallery_open);
+    reg_app("sys_messages", "Сообщения",    "mail",    0x22C55E, NULL, messages_open);
+    reg_app("sys_gallery",  "Галерея",     "image",   0xF97316, NULL, gallery_open);
     reg_app("sys_music",    "Музыка",      "audio",   0xFF4D6D, NULL, music_open);
 
     reg_folder(GRP_TOOLS, "Инструменты", 0xFF9F0A);
@@ -160,12 +161,13 @@ static void register_system_apps(void)
     reg_app("sys_battery",  "Батарея",     "battery", 0x30D158, NULL, battery_open);
 
     reg_folder(GRP_SYSTEM, "Система", 0x6B7280);
-    reg_app("sys_settings", "Settings",    "settings", 0x3B82F6, GRP_SYSTEM, settings_open);
-    reg_app("sys_display",  "Display",     "video",   0xD946EF, GRP_SYSTEM, display_open);
-    reg_app("sys_sync",     "Sync",        "refresh", 0x14B8A6, GRP_SYSTEM, sync_app_open);
-    reg_app("sys_files",    "Files",       "folder",  0xFACC15, GRP_SYSTEM, files_open);
-    reg_app("sys_security", "Security",    "eye",     0x6B7280, GRP_SYSTEM, security_open);
-    reg_app("sys_install",  "Install",     "download", 0x0EA5E9, GRP_SYSTEM, installer_open);
+    reg_app("sys_settings", "Настройки",    "settings", 0x3B82F6, GRP_SYSTEM, settings_open);
+    reg_app("sys_display",  "Экран",     "video",   0xD946EF, GRP_SYSTEM, display_open);
+    reg_app("sys_sync",     "Связь",        "refresh", 0x14B8A6, GRP_SYSTEM, sync_app_open);
+    reg_app("sys_files",    "Файлы",       "folder",  0xFACC15, GRP_SYSTEM, files_open);
+    reg_app("sys_security", "Защита",    "eye",     0x6B7280, GRP_SYSTEM, security_open);
+    reg_app("sys_about",    "О часах",     "list",    0x8E8E93, GRP_SYSTEM, about_open);
+    reg_app("sys_install",  "Установка",    "download", 0x0EA5E9, GRP_SYSTEM, installer_open);
 #ifdef WATCH_DIAG_APPS
     reg_app("sys_buttons",  "Кнопки",      "ok",      0x8B5CF6, GRP_SYSTEM, buttons_test_open);
     reg_app("sys_gyro",     "Гироскоп",    "refresh", 0x06B6D4, GRP_SYSTEM, gyro_test_open);

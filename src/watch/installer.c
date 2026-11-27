@@ -35,43 +35,43 @@ static bool valid_id(const char *s)
 
 bool installer_validate(const cJSON *pkg, char *err, size_t n)
 {
-    if (!cJSON_IsObject(pkg)) FAIL("Not an app package");
-    if (!valid_id(jstr(pkg, "id"))) FAIL("Bad app id (a-z 0-9 _ -)");
+    if (!cJSON_IsObject(pkg)) FAIL("Это не пакет приложения");
+    if (!valid_id(jstr(pkg, "id"))) FAIL("Неверный id приложения (a-z 0-9 _ -)");
 
     const cJSON *m = cJSON_GetObjectItemCaseSensitive(pkg, "manifest");
     const cJSON *app = cJSON_GetObjectItemCaseSensitive(pkg, "app");
-    if (!cJSON_IsObject(m) || !cJSON_IsObject(app)) FAIL("Missing manifest or app");
+    if (!cJSON_IsObject(m) || !cJSON_IsObject(app)) FAIL("Нет manifest или app");
 
     const char *name = jstr(m, "name");
-    if (!name || !name[0] || strlen(name) >= sizeof(((app_info_t *)0)->name)) FAIL("Bad app name");
+    if (!name || !name[0] || strlen(name) >= sizeof(((app_info_t *)0)->name)) FAIL("Неверное имя приложения");
     const char *col = jstr(m, "color");
-    if (col && !(col[0] == '#' && strlen(col) == 7 && strspn(col + 1, "0123456789abcdefABCDEF") == 6)) FAIL("Bad color");
+    if (col && !(col[0] == '#' && strlen(col) == 7 && strspn(col + 1, "0123456789abcdefABCDEF") == 6)) FAIL("Неверный цвет");
 
     const cJSON *perms = cJSON_GetObjectItemCaseSensitive(m, "permissions");
-    if (perms && !cJSON_IsArray(perms)) FAIL("Bad permissions");
+    if (perms && !cJSON_IsArray(perms)) FAIL("Неверные разрешения");
     const cJSON *p;
     cJSON_ArrayForEach(p, perms) {
         if (!cJSON_IsString(p) || (strcmp(p->valuestring, "net") != 0 && strcmp(p->valuestring, "storage") != 0))
-            FAIL("Unknown permission");
+            FAIL("Неизвестное разрешение");
     }
 
     const cJSON *screens = cJSON_GetObjectItemCaseSensitive(app, "screens");
     const char *start = jstr(app, "start");
-    if (!cJSON_IsObject(screens) || !start) FAIL("Missing start/screens");
+    if (!cJSON_IsObject(screens) || !start) FAIL("Нет start/screens");
     int count = 0;
     const cJSON *sc;
     cJSON_ArrayForEach(sc, screens) {
-        if (++count > MAX_SCREENS) FAIL("Too many screens");
-        if (!sc->string || strlen(sc->string) >= 24) FAIL("Screen name too long");
-        if (!cJSON_IsObject(sc)) FAIL("Bad screen");
+        if (++count > MAX_SCREENS) FAIL("Слишком много экранов");
+        if (!sc->string || strlen(sc->string) >= 24) FAIL("Слишком длинное имя экрана");
+        if (!cJSON_IsObject(sc)) FAIL("Неверный экран");
     }
-    if (!cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(screens, start))) FAIL("Start screen not found");
+    if (!cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(screens, start))) FAIL("Стартовый экран не найден");
 
     char *a = cJSON_PrintUnformatted(app);
     char *mm = cJSON_PrintUnformatted(m);
     bool big = (a && strlen(a) > APP_MAX_BYTES) || (mm && strlen(mm) > MANIFEST_MAX);
     free(a); free(mm);
-    if (big) FAIL("App is too large");
+    if (big) FAIL("Приложение слишком большое");
     return true;
 }
 
@@ -81,7 +81,7 @@ bool installer_fetch(const char *url, cJSON **out, char *err, size_t n)
     if (!txt) return false;
     cJSON *p = cJSON_ParseWithLength(txt, strlen(txt));
     free(txt);
-    if (!p) FAIL("Not valid JSON");
+    if (!p) FAIL("Некорректный JSON");
     if (!installer_validate(p, err, n)) { cJSON_Delete(p); return false; }
     *out = p;
     return true;
@@ -113,7 +113,7 @@ bool installer_commit(const cJSON *pkg, char *err, size_t n)
     if (ok) { snprintf(path, sizeof path, "%s/app.json", dir);      ok = fs_write_file(path, atxt, strlen(atxt)); }
     if (ok) { snprintf(path, sizeof path, "%s/manifest.json", dir); ok = fs_write_file(path, mtxt, strlen(mtxt)); }
     free(mtxt); free(atxt);
-    if (!ok) FAIL("Write failed");
+    if (!ok) FAIL("Ошибка записи");
     return true;
 }
 
@@ -162,16 +162,16 @@ static void install_confirm_cb(bool ok, void *ud)
     pending_pkg = NULL;
     if (!pkg) return;
     if (ok) {
-        char err[64];
+        char err[128];
         if (installer_commit(pkg, err, sizeof err)) {
-            set_status("Installed", 0x22C55E);
-            sys_toast("App installed");
+            set_status("Установлено", 0x22C55E);
+            sys_toast("Приложение установлено");
             after_change();
         } else {
             set_status(err, 0xEF4444);
         }
     } else {
-        set_status("Cancelled", 0x9CA3AF);
+        set_status("Отменено", 0x9CA3AF);
     }
     cJSON_Delete(pkg);
 }
@@ -183,12 +183,12 @@ static void install_btn_cb(lv_event_t *e)
     sys_keyboard_hide();
     char url[256];
     snprintf(url, sizeof url, "%s", lv_textarea_get_text(url_ta));
-    if (!url[0]) { set_status("Enter a link first", 0xEF4444); return; }
+    if (!url[0]) { set_status("Сначала введите ссылку", 0xEF4444); return; }
 
-    set_status("Downloading...", 0x9CA3AF);
+    set_status("Загрузка...", 0x9CA3AF);
     lv_refr_now(NULL);   // net_get блокирующий: сначала рисуем статус
 
-    char err[64];
+    char err[128];
     cJSON *pkg = NULL;
     if (!installer_fetch(url, &pkg, err, sizeof err)) { set_status(err, 0xEF4444); return; }
 
@@ -198,7 +198,7 @@ static void install_btn_cb(lv_event_t *e)
     char msg[320], plist[96] = "";
     const cJSON *p;
     cJSON_ArrayForEach(p, perms) {
-        const char *human = strcmp(p->valuestring, "net") == 0 ? "Network" : "Storage";
+        const char *human = strcmp(p->valuestring, "net") == 0 ? "Сеть" : "Хранилище";
         if (plist[0]) strncat(plist, ", ", sizeof plist - strlen(plist) - 1);
         strncat(plist, human, sizeof plist - strlen(plist) - 1);
     }
@@ -207,21 +207,21 @@ static void install_btn_cb(lv_event_t *e)
     char *old = fs_read_file(path, MANIFEST_MAX);
     bool exists = old != NULL;
     free(old);
-    snprintf(msg, sizeof msg, "%s\nAccess: %s\nFrom: %.80s",
+    snprintf(msg, sizeof msg, "%s\nДоступ: %s\nОткуда: %.80s",
              jstr(m, "name"), plist[0] ? plist : "none", url);
 
     if (pending_pkg) cJSON_Delete(pending_pkg);
     pending_pkg = pkg;
-    set_status("Waiting for confirmation", 0x9CA3AF);
-    sys_confirm(exists ? "Update app?" : "Install app?", msg, install_confirm_cb, NULL);
+    set_status("Ждём подтверждения", 0x9CA3AF);
+    sys_confirm(exists ? "Обновить приложение?" : "Установить приложение?", msg, install_confirm_cb, NULL);
 }
 
 static void delete_confirm_cb(bool ok, void *ud)
 {
     LV_UNUSED(ud);
     if (!ok) return;
-    if (installer_uninstall(pending_del)) sys_toast("App removed");
-    else sys_toast("Could not remove all files");
+    if (installer_uninstall(pending_del)) sys_toast("Приложение удалено");
+    else sys_toast("Не удалось удалить все файлы");
     after_change();
 }
 
@@ -229,9 +229,9 @@ static void trash_cb(lv_event_t *e)
 {
     const app_info_t *a = lv_event_get_user_data(e);
     snprintf(pending_del, sizeof pending_del, "%s", a->id);
-    char msg[64];
-    snprintf(msg, sizeof msg, "Remove %s and its data?", a->name);
-    sys_confirm("Delete app?", msg, delete_confirm_cb, NULL);
+    char msg[128];
+    snprintf(msg, sizeof msg, "Удалить %s и его данные?", a->name);
+    sys_confirm("Удалить приложение?", msg, delete_confirm_cb, NULL);
 }
 
 static void rebuild_list(void)
@@ -280,13 +280,13 @@ void installer_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
     lv_obj_t *body;
-    lv_obj_t *scr = sys_screen_create_root("Install app", back_cb, &body);
+    lv_obj_t *scr = sys_screen_create_root("Установка", back_cb, &body);
     lv_obj_add_event_cb(scr, screen_deleted_cb, LV_EVENT_DELETE, NULL);
 
     lv_obj_t *hint = lv_label_create(body);
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(hint, lv_pct(100));
-    lv_label_set_text(hint, "Link to an app package (.json):");
+    lv_label_set_text(hint, "Ссылка на пакет приложения (.json):");
     lv_obj_set_style_text_color(hint, lv_color_hex(0x9CA3AF), 0);
 
     url_ta = lv_textarea_create(body);
@@ -306,7 +306,7 @@ void installer_open(lv_obj_t *launcher)
     lv_obj_set_style_shadow_width(btn, 0, 0);
     lv_obj_set_style_bg_color(btn, lv_color_hex(0x0EA5E9), 0);
     lv_obj_t *bl = lv_label_create(btn);
-    lv_label_set_text(bl, "Install");
+    lv_label_set_text(bl, "Установить");
     lv_obj_center(bl);
     lv_obj_add_event_cb(btn, install_btn_cb, LV_EVENT_CLICKED, NULL);
 
@@ -316,7 +316,7 @@ void installer_open(lv_obj_t *launcher)
     lv_label_set_text(status_lbl, "");
 
     lv_obj_t *h2 = lv_label_create(body);
-    lv_label_set_text(h2, "Installed apps");
+    lv_label_set_text(h2, "Установленные приложения");
     lv_obj_set_style_text_color(h2, lv_color_hex(0x9CA3AF), 0);
 
     list_box = lv_obj_create(body);

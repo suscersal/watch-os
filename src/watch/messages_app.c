@@ -44,14 +44,14 @@ static void item_cb(lv_event_t *e)
     messages_mark_read(i);
 
     lv_obj_t *body;
-    lv_obj_t *scr = sys_screen_create(m->app[0] ? m->app : "Message", detail_back_cb, &body);
+    lv_obj_t *scr = sys_screen_create(m->app[0] ? m->app : "Сообщение", detail_back_cb, &body);
     if (m->ts) {
         char tb[32];
         clock_format_epoch(m->ts, tb, sizeof tb);
         label(body, tb, 0x9CA3AF, WATCH_FONT_SMALL);
     }
     if (m->title[0]) label(body, m->title, 0xFFFFFF, WATCH_FONT_LARGE);
-    label(body, m->text[0] ? m->text : "(no text)", 0xD1D5DB, NULL);
+    label(body, m->text[0] ? m->text : "(без текста)", 0xD1D5DB, NULL);
     lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);   // список не удаляем
     lv_async_call(build_async, NULL);   // пометка «прочитано» видна при возврате
 }
@@ -68,7 +68,7 @@ static void build_list(void)
     if (!g_list_body) return;
     lv_obj_clean(g_list_body);
     size_t n = messages_count();
-    if (n == 0) { label(g_list_body, "No messages", 0x9CA3AF, NULL); return; }
+    if (n == 0) { label(g_list_body, "Нет сообщений", 0x9CA3AF, NULL); return; }
     for (size_t i = 0; i < n; i++) {
         const msg_t *m = messages_get(i);
         lv_obj_t *b = lv_button_create(g_list_body);
@@ -80,7 +80,7 @@ static void build_list(void)
         lv_obj_set_flex_flow(b, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_style_pad_row(b, 2, 0);
         char head[80];
-        snprintf(head, sizeof head, "%s%s", m->read ? "" : LV_SYMBOL_BULLET " ", m->app[0] ? m->app : "Message");
+        snprintf(head, sizeof head, "%s%s", m->read ? "" : LV_SYMBOL_BULLET " ", m->app[0] ? m->app : "Сообщение");
         lv_obj_t *a = label(b, head, m->read ? 0x6B7280 : 0x22C55E, WATCH_FONT_SMALL);
         lv_label_set_long_mode(a, LV_LABEL_LONG_DOT);
         lv_obj_t *t = label(b, m->title[0] ? m->title : m->text, 0xFFFFFF, NULL);
@@ -94,7 +94,7 @@ static void build_list(void)
     lv_obj_set_style_shadow_width(c, 0, 0);
     lv_obj_set_style_bg_color(c, lv_color_hex(0x6B7280), 0);
     lv_obj_t *cl = lv_label_create(c);
-    lv_label_set_text(cl, "Clear all");
+    lv_label_set_text(cl, "Очистить");
     lv_obj_center(cl);
     lv_obj_add_event_cb(c, clear_cb, LV_EVENT_CLICKED, NULL);
 }
@@ -102,7 +102,7 @@ static void build_list(void)
 void messages_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    g_list_scr = sys_screen_create_root("Messages", back_cb, &g_list_body);
+    g_list_scr = sys_screen_create_root("Сообщения", back_cb, &g_list_body);
     lv_obj_add_event_cb(g_list_scr, list_deleted_cb, LV_EVENT_DELETE, NULL);
     build_list();
     lv_screen_load_anim(g_list_scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);

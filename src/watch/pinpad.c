@@ -56,7 +56,7 @@ static void key_cb(lv_event_t *e)
         update_dots(p);
     } else if (key == KEY_OK) {
         if (p->n >= AUTH_PIN_MIN) submit(p);
-        else pinpad_set_message(lv_obj_get_parent(p->title), "At least 4 digits", 0xEF4444);
+        else pinpad_set_message(lv_obj_get_parent(p->title), "Не менее 4 цифр", 0xEF4444);
     } else if (p->n < AUTH_PIN_MAX) {
         p->pin[p->n++] = (char)('0' + key);
         update_dots(p);

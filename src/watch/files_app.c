@@ -186,7 +186,7 @@ static void delete_done(bool ok, void *ud)
     char real[PATH_MAX_LEN + 8];
     real_path(g_del_path, real, sizeof real);
     bool was_dir = fs_is_dir(real);
-    if (!fs_remove(real)) { sys_toast(was_dir ? "Folder is not empty" : "Could not delete"); return; }
+    if (!fs_remove(real)) { sys_toast(was_dir ? "Папка не пуста" : "Не удалось удалить"); return; }
 
     // Фото в Gallery - пара файлов: полный кадр и миниатюра (<имя>.jpg и <имя>.t.jpg). Удаляем обе половины.
     size_t n = strlen(g_del_path);
@@ -197,7 +197,7 @@ static void delete_done(bool ok, void *ud)
         else other[0] = '\0';
         if (other[0]) remove_one(other);
     }
-    sys_toast(was_dir ? "Folder deleted" : "Deleted");
+    sys_toast(was_dir ? "Папка удалена" : "Удалено");
     if (was_dir) {                                       // папки уже нет: поднимаемся на уровень выше
         char *s = strrchr(g_cwd, '/');
         if (s) *s = '\0'; else g_cwd[0] = '\0';
@@ -209,7 +209,7 @@ static void delete_done(bool ok, void *ud)
 static void delete_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
-    sys_confirm("Delete?", g_del_path, delete_done, NULL);
+    sys_confirm("Удалить?", g_del_path, delete_done, NULL);
 }
 
 static void show_detail(const entry_t *en)
@@ -220,7 +220,7 @@ static void show_detail(const entry_t *en)
     snprintf(g_del_path, sizeof g_del_path, "%s", rel);
 
     lv_obj_t *body;
-    lv_obj_t *scr = sys_screen_create(en->dir ? "Folder" : "File", detail_back_cb, &body);
+    lv_obj_t *scr = sys_screen_create(en->dir ? "Папка" : "Файл", detail_back_cb, &body);
     label(body, en->name, 0xFFFFFF, WATCH_FONT_LARGE);
     label(body, rel, 0x9CA3AF, WATCH_FONT_SMALL);
     if (!en->dir) {
@@ -228,7 +228,7 @@ static void show_detail(const entry_t *en)
         fmt_size(en->size, sz, sizeof sz);
         label(body, sz, 0x9CA3AF, NULL);
         if (is_private(rel)) {
-            label(body, "System data: preview is hidden", 0x9CA3AF, WATCH_FONT_SMALL);
+            label(body, "Системные данные: просмотр скрыт", 0x9CA3AF, WATCH_FONT_SMALL);
         } else if (is_text_name(en->name)) {
             char buf[PREVIEW_BYTES + 1];
             long got = fs_read_range(real, 0, buf, PREVIEW_BYTES);
@@ -246,12 +246,12 @@ static void show_detail(const entry_t *en)
                 label(body, buf, 0xD1D5DB, WATCH_FONT_SMALL);
             }
         } else if (ends_with(en->name, ".jpg")) {
-            label(body, "Photo: open it in Gallery", 0x9CA3AF, WATCH_FONT_SMALL);
+            label(body, "Фото: откройте в Галерее", 0x9CA3AF, WATCH_FONT_SMALL);
         }
     }
     lv_obj_t *b = row_btn(body, 0xB91C1C, delete_cb, NULL);
     lv_obj_t *l = lv_label_create(b);
-    lv_label_set_text(l, en->dir ? LV_SYMBOL_TRASH " Delete folder" : LV_SYMBOL_TRASH " Delete");
+    lv_label_set_text(l, en->dir ? LV_SYMBOL_TRASH " Удалить папку" : LV_SYMBOL_TRASH " Удалить");
     lv_obj_set_style_text_color(l, lv_color_white(), 0);
     lv_obj_center(l);
     lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);   // список не удаляем
@@ -290,7 +290,7 @@ static void rmdir_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
     snprintf(g_del_path, sizeof g_del_path, "%s", g_cwd);
-    sys_confirm("Delete folder?", g_del_path, delete_done, NULL);
+    sys_confirm("Удалить папку?", g_del_path, delete_done, NULL);
 }
 
 static void build_list(void)
@@ -303,7 +303,7 @@ static void build_list(void)
     if (g_cwd[0]) {
         lv_obj_t *b = row_btn(g_body, WS_FILL2, up_cb, NULL);
         lv_obj_t *l = lv_label_create(b);
-        lv_label_set_text(l, LV_SYMBOL_LEFT "  Back");
+        lv_label_set_text(l, LV_SYMBOL_LEFT "  Назад");
         lv_obj_set_style_text_color(l, lv_color_white(), 0);
         lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
     }
@@ -332,12 +332,12 @@ static void build_list(void)
             lv_obj_align(s, LV_ALIGN_RIGHT_MID, 0, 0);
         }
     }
-    if (g_n == 0) label(g_body, g_cwd[0] ? "Empty folder" : "No folders", 0x9CA3AF, NULL);
-    if (g_truncated) label(g_body, "Only the first 64 items are shown", 0x9CA3AF, WATCH_FONT_SMALL);
+    if (g_n == 0) label(g_body, g_cwd[0] ? "Пустая папка" : "Нет папок", 0x9CA3AF, NULL);
+    if (g_truncated) label(g_body, "Показаны только первые 64 элемента", 0x9CA3AF, WATCH_FONT_SMALL);
     if (g_cwd[0] && g_n == 0 && strchr(g_cwd, '/')) {          // пустую вложенную папку можно удалить; корневые apps/data/packages - нет
         lv_obj_t *b = row_btn(g_body, 0xB91C1C, rmdir_cb, NULL);
         lv_obj_t *l = lv_label_create(b);
-        lv_label_set_text(l, LV_SYMBOL_TRASH " Delete folder");
+        lv_label_set_text(l, LV_SYMBOL_TRASH " Удалить папку");
         lv_obj_set_style_text_color(l, lv_color_white(), 0);
         lv_obj_center(l);
     }
@@ -363,7 +363,7 @@ void files_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
     g_cwd[0] = '\0';
-    g_scr = sys_screen_create_root_text("Files", exit_cb, &g_body, "/", &g_right);
+    g_scr = sys_screen_create_root_text("Файлы", exit_cb, &g_body, "/", &g_right);
     lv_obj_add_event_cb(g_scr, gone_cb, LV_EVENT_DELETE, NULL);
     lv_obj_set_flex_flow(g_body, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(g_body, 8, 0);

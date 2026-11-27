@@ -31,7 +31,7 @@ static void sc_set(app_run_t *r, const cJSON *a)
 {
     LV_UNUSED(r);
     const char *var = jstr(a, "var");
-    if (!vars_valid_name(var)) { sys_toast("set: bad var name"); return; }
+    if (!vars_valid_name(var)) { sys_toast("set: неверное имя переменной"); return; }
     char val[VAR_VAL];
     arg_text(a, "value", val, sizeof val);
     vars_set(var, val);
@@ -41,7 +41,7 @@ static void sc_add(app_run_t *r, const cJSON *a)
 {
     LV_UNUSED(r);
     const char *var = jstr(a, "var");
-    if (!vars_valid_name(var)) { sys_toast("add: bad var name"); return; }
+    if (!vars_valid_name(var)) { sys_toast("add: неверное имя переменной"); return; }
     char val[VAR_VAL], res[VAR_VAL];
     arg_text(a, "value", val, sizeof val);
     double sum = strtod(vars_get(var), NULL) + (val[0] ? strtod(val, NULL) : 1.0);
@@ -52,7 +52,7 @@ static void sc_add(app_run_t *r, const cJSON *a)
 static void sc_goto(app_run_t *r, const cJSON *a)
 {
     const char *s = jstr(a, "screen");
-    if (!s) { sys_toast("goto: no screen"); return; }
+    if (!s) { sys_toast("goto: нет экрана"); return; }
     app_nav_goto(r, s);
 }
 
@@ -72,10 +72,10 @@ static void sc_ai_ask(app_run_t *r, const cJSON *a)
     LV_UNUSED(r);
     char q[VAR_VAL - 16], res[VAR_VAL], err[96];
     arg_text(a, "q", q, sizeof q);
-    sys_toast("Asking AI...");
+    sys_toast("Спрашиваю ИИ...");
     lv_refr_now(NULL);                      // запрос блокирующий: сначала рисуем статус
     if (!ai_ask(q, res, sizeof res, err, sizeof err)) {
-        snprintf(res, sizeof res, "Error: %s", err);
+        snprintf(res, sizeof res, "Ошибка: %s", err);
         sys_toast(err);
     }
     const char *out = jstr(a, "out");
@@ -91,10 +91,10 @@ static void sc_ai_ask_table(app_run_t *r, const cJSON *a)
     arg_text(a, "q", q, sizeof q);
     const char *out = jstr(a, "out");
     const char *name = vars_valid_name(out) ? out : "result";
-    sys_toast("Asking AI...");
+    sys_toast("Спрашиваю ИИ...");
     lv_refr_now(NULL);
     if (!ai_ask_table(q, name, err, sizeof err)) {
-        const char *cells[] = { "Error", err };
+        const char *cells[] = { "Ошибка", err };
         tables_set_cells(name, 1, 2, cells);
         sys_toast(err);
     }
@@ -104,7 +104,7 @@ static void sc_ai_ask_table(app_run_t *r, const cJSON *a)
 static void sc_store_get(app_run_t *r, const cJSON *a)
 {
     const char *key = jstr(a, "key");
-    if (!vars_valid_name(key)) { sys_toast("store: bad key"); return; }
+    if (!vars_valid_name(key)) { sys_toast("store: неверный ключ"); return; }
     const char *out = jstr(a, "out");
     char val[VAR_VAL], def[VAR_VAL];
     arg_text(a, "default", def, sizeof def);
@@ -115,16 +115,16 @@ static void sc_store_get(app_run_t *r, const cJSON *a)
 static void sc_store_set(app_run_t *r, const cJSON *a)
 {
     const char *key = jstr(a, "key");
-    if (!vars_valid_name(key)) { sys_toast("store: bad key"); return; }
+    if (!vars_valid_name(key)) { sys_toast("store: неверный ключ"); return; }
     char val[VAR_VAL];
     arg_text(a, "value", val, sizeof val);
-    if (!storage_set(r->app->id, key, val)) sys_toast("Cannot save");
+    if (!storage_set(r->app->id, key, val)) sys_toast("Не удалось сохранить");
 }
 
 static void sc_store_remove(app_run_t *r, const cJSON *a)
 {
     const char *key = jstr(a, "key");
-    if (!vars_valid_name(key)) { sys_toast("store: bad key"); return; }
+    if (!vars_valid_name(key)) { sys_toast("store: неверный ключ"); return; }
     storage_remove(r->app->id, key);
 }
 
@@ -144,10 +144,10 @@ static void sc_confirm(app_run_t *r, const cJSON *a)
     char t[VAR_VAL];
     arg_text(a, "text", t, sizeof t);
     const cJSON *yes = cJSON_GetObjectItemCaseSensitive(a, "on_yes");
-    if (!cJSON_IsArray(yes)) { sys_toast("confirm: no on_yes"); return; }
+    if (!cJSON_IsArray(yes)) { sys_toast("confirm: нет on_yes"); return; }
     pend_confirm.r = r;
     pend_confirm.yes = yes;
-    sys_confirm(jstr(a, "title") ? jstr(a, "title") : "Confirm", t, confirm_done, NULL);
+    sys_confirm(jstr(a, "title") ? jstr(a, "title") : "Подтвердите", t, confirm_done, NULL);
 }
 
 static const sys_entry_t table[] = {
@@ -176,10 +176,10 @@ void sys_run_actions(app_run_t *r, const cJSON *actions)
         for (size_t i = 0; name && i < sizeof(table) / sizeof(table[0]); i++)
             if (strcmp(table[i].name, name) == 0) { e = &table[i]; break; }
 
-        if (!e) { sys_toast("Unknown call"); break; }
+        if (!e) { sys_toast("Неизвестный вызов"); break; }
         if (e->perm & ~r->app->perms) {
             char msg[64];
-            snprintf(msg, sizeof msg, "No permission: %s", e->name);
+            snprintf(msg, sizeof msg, "Нет разрешения: %s", e->name);
             sys_toast(msg);
             break;
         }

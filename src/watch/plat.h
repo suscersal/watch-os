@@ -44,3 +44,16 @@ const char *plat_sd_root(void);
 // ESP32: мотор на GPIO18 (включение выходом без ШИМ, как в заводском примере Waveshare), выключает таймер esp_timer.
 // ПК: мотора нет, узор печатается в консоль строкой "[haptic] ...".
 void plat_haptic(const uint16_t *pattern_ms, int n);
+
+// Сведения о системе для экрана «О часах». Нули и пустые строки - неизвестно.
+// ESP32: версия и дата сборки из описания запущенной прошивки (после OTA это уже новая), память из heap_caps,
+// хранилище - раздел LittleFS. ПК: версия WATCH_VERSION (по умолчанию "dev"), хранилище - диск, где лежит папка запуска.
+typedef struct {
+    char        version[32];                 // версия прошивки
+    char        built[32];                   // дата и время сборки
+    const char *platform;                    // "ESP32-S3" или "ПК (симулятор)"
+    size_t      heap_free, heap_total;       // внутренняя оперативная память, байты
+    size_t      psram_free, psram_total;     // внешняя PSRAM, байты
+    size_t      store_free, store_total;     // раздел с файлами, байты
+} plat_sysinfo_t;
+void plat_sysinfo(plat_sysinfo_t *out);

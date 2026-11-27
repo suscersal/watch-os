@@ -2,16 +2,16 @@
   "start": "main",
   "screens": {
     "main": {
-      "title": "Ask",
+      "title": "Спросить",
       "ui": [
         {
           "type": "input",
           "var": "q",
-          "placeholder": "Question"
+          "placeholder": "Вопрос"
         },
         {
           "type": "button",
-          "text": "Ask",
+          "text": "Спросить",
           "on_click": [
             {
               "do": "ai.ask",
@@ -22,7 +22,7 @@
         },
         {
           "type": "button",
-          "text": "Table",
+          "text": "Таблица",
           "on_click": [
             {
               "do": "ai.ask_table",
@@ -42,7 +42,7 @@
       ]
     },
     "table": {
-      "title": "Table",
+      "title": "Таблица",
       "ui": [
         {
           "type": "table",

@@ -86,3 +86,22 @@ const char *plat_sd_root(void)
 }
 
 bool plat_sd_present(void) { return plat_sd_root() != NULL; }
+
+#include <sys/statvfs.h>
+
+#ifndef WATCH_VERSION
+#define WATCH_VERSION "dev"
+#endif
+
+void plat_sysinfo(plat_sysinfo_t *o)
+{
+    memset(o, 0, sizeof *o);
+    snprintf(o->version, sizeof o->version, "%s", WATCH_VERSION);
+    snprintf(o->built, sizeof o->built, "%s %s", __DATE__, __TIME__);
+    o->platform = "ПК (симулятор)";
+    struct statvfs sv;
+    if (statvfs(".", &sv) == 0) {
+        o->store_total = (size_t)sv.f_blocks * sv.f_frsize;
+        o->store_free  = (size_t)sv.f_bavail * sv.f_frsize;
+    }
+}

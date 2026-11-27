@@ -72,26 +72,26 @@ static void refresh(st_t *s)
     bool ok = false;
     switch (s->rep.status) {
     case CC_EMPTY:
-        snprintf(b, sizeof b, "Row %d, col %d  -  %d left", s->cur / CC_N + 1, s->cur % CC_N + 1, s->rep.empty);
+        snprintf(b, sizeof b, "Строка %d, столбец %d  -  осталось %d", s->cur / CC_N + 1, s->cur % CC_N + 1, s->rep.empty);
         set_status(s, b, WS_TEXT2);
         break;
     case CC_OK: {
         char ssid[33], pass[64];
         if (cc_wifi_decode(s->cells, ssid, pass) == 0) {
-            snprintf(b, sizeof b, "Correct: %s", ssid);
+            snprintf(b, sizeof b, "Верно: %s", ssid);
             set_status(s, b, WS_GREEN);
             ok = true;
         } else {
-            set_status(s, "Correct, but not a Wi-Fi code", WS_RED);
+            set_status(s, "Верно, но это не код Wi-Fi", WS_RED);
         }
         break;
     }
     case CC_FIXABLE:
-        snprintf(b, sizeof b, "Wrong cell: row %d, col %d", s->rep.row + 1, s->rep.col + 1);
+        snprintf(b, sizeof b, "Ошибка в клетке: строка %d, столбец %d", s->rep.row + 1, s->rep.col + 1);
         set_status(s, b, WS_ORANGE);
         break;
     default:
-        snprintf(b, sizeof b, "Mismatch: %d rows, %d cols", s->rep.bad_rows, s->rep.bad_cols);
+        snprintf(b, sizeof b, "Не сходится: строк %d, столбцов %d", s->rep.bad_rows, s->rep.bad_cols);
         set_status(s, b, WS_RED);
         break;
     }
@@ -153,7 +153,7 @@ static void clear_confirm_cb(bool ok, void *ud)
 
 static void clear_cb(lv_event_t *e)
 {
-    sys_confirm("Clear", "Erase all cells?", clear_confirm_cb, lv_event_get_user_data(e));
+    sys_confirm("Стереть", "Стереть все клетки?", clear_confirm_cb, lv_event_get_user_data(e));
 }
 
 static void root_deleted_cb(lv_event_t *e)
@@ -202,8 +202,8 @@ lv_obj_t *colorgrid_create(lv_obj_t *parent, colorgrid_done_cb cb, void *ud)
     lv_obj_set_style_text_align(s->status, LV_TEXT_ALIGN_CENTER, 0);
 
     // Connect / исправить появляются над клавишами и сдвигают всё вниз только когда нужны
-    s->btn_ok = pill(root, SIDE, 44, WS_BLUE, "Connect", WATCH_FONT_BODY, 0xFFFFFF, ok_cb, s);
-    s->btn_fix = pill(root, SIDE, 44, WS_ORANGE, "Fix the marked cell", WATCH_FONT_BODY, 0x000000, fix_cb, s);
+    s->btn_ok = pill(root, SIDE, 44, WS_BLUE, "Подключить", WATCH_FONT_BODY, 0xFFFFFF, ok_cb, s);
+    s->btn_fix = pill(root, SIDE, 44, WS_ORANGE, "Исправьте отмеченную клетку", WATCH_FONT_BODY, 0x000000, fix_cb, s);
 
     lv_obj_t *row = lv_obj_create(root);
     lv_obj_remove_style_all(row);
@@ -245,9 +245,9 @@ lv_obj_t *colorgrid_create(lv_obj_t *parent, colorgrid_done_cb cb, void *ud)
     lv_obj_set_width(hint, lv_pct(100));
     lv_obj_set_style_text_font(hint, WATCH_FONT_SMALL, 0);
     lv_obj_set_style_text_color(hint, lv_color_hex(WS_TEXT2), 0);
-    lv_label_set_text(hint, "Press the colors in the order they appear on the phone: row by row, left to right. "
-                            "The last row and column are check cells, enter them too.");
-    pill(root, SIDE, 44, WS_FILL, "Clear all", WATCH_FONT_BODY, WS_TEXT2, clear_cb, s);
+    lv_label_set_text(hint, "Нажимайте цвета в том порядке, в каком они на экране: строка за строкой, слева направо. "
+                            "Последние строка и столбец - проверочные, вводите их тоже.");
+    pill(root, SIDE, 44, WS_FILL, "Очистить всё", WATCH_FONT_BODY, WS_TEXT2, clear_cb, s);
 
     refresh(s);
     return root;

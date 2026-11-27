@@ -43,7 +43,7 @@ void app_runtime_launch(const app_info_t *a, lv_obj_t *launcher)
     char path[160];
     snprintf(path, sizeof path, "%s/%s", a->dir, a->entry);
     char *txt = fs_read_file(path, APP_JSON_MAX);
-    if (!txt) { sys_toast("Cannot read app (missing or >16 KB)"); return; }
+    if (!txt) { sys_toast("Не удалось прочитать приложение (нет файла или >16 КБ)"); return; }
     cJSON *root = cJSON_ParseWithLength(txt, strlen(txt));
     free(txt);
     if (!root) { sys_toast("app.json: syntax error"); return; }
@@ -78,10 +78,10 @@ void app_nav_goto(app_run_t *r, const char *name)
 {
     if (strlen(name) >= sizeof r->hist[0] ||
         !cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(r->screens, name))) {
-        sys_toast("Unknown screen");
+        sys_toast("Неизвестный экран");
         return;
     }
-    if (r->depth >= MAX_HIST) { sys_toast("Too many screens"); return; }
+    if (r->depth >= MAX_HIST) { sys_toast("Слишком много экранов"); return; }
     snprintf(r->hist[r->depth], sizeof r->hist[0], "%s", name);
     r->depth++;
     sys_keyboard_hide();

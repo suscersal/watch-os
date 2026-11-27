@@ -13,8 +13,8 @@ static lv_obj_t   *g_face, *g_time, *g_date, *g_unread, *g_hint;
 static lv_timer_t *g_timer;
 static bool        g_hooks;
 
-static const char *const days[]   = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-static const char *const months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+static const char *const days[]   = { "Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб" };
+static const char *const months[] = { "янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек" };
 
 static void set_text(lv_obj_t *l, const char *t) { if (strcmp(lv_label_get_text(l), t) != 0) lv_label_set_text(l, t); }
 
@@ -22,7 +22,7 @@ static void refresh(void)
 {
     if (!g_face) return;
     struct tm t;
-    char b[40];
+    char b[64];
     if (clock_local(&t)) {
         snprintf(b, sizeof b, "%02d:%02d", t.tm_hour, t.tm_min);
         set_text(g_time, b);
@@ -31,11 +31,11 @@ static void refresh(void)
         lv_obj_add_flag(g_hint, LV_OBJ_FLAG_HIDDEN);
     } else {
         set_text(g_time, "--:--");
-        set_text(g_date, "Time not set");
+        set_text(g_date, "Время не задано");
         lv_obj_remove_flag(g_hint, LV_OBJ_FLAG_HIDDEN);   // подсказка, как задать время
     }
     size_t n = messages_unread();
-    if (n) { snprintf(b, sizeof b, LV_SYMBOL_ENVELOPE "  %u new", (unsigned)n); set_text(g_unread, b); lv_obj_remove_flag(g_unread, LV_OBJ_FLAG_HIDDEN); }
+    if (n) { snprintf(b, sizeof b, LV_SYMBOL_ENVELOPE "  новых: %u", (unsigned)n); set_text(g_unread, b); lv_obj_remove_flag(g_unread, LV_OBJ_FLAG_HIDDEN); }
     else   lv_obj_add_flag(g_unread, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -140,7 +140,7 @@ void watchface_show(lv_obj_t *launcher)
     lv_label_set_long_mode(g_hint, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(g_hint, 300);
     lv_obj_set_style_text_align(g_hint, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(g_hint, "Set the time: open Sync and connect the phone app");
+    lv_label_set_text(g_hint, "Задайте время: откройте «Связь» и подключите приложение на телефоне");
     lv_obj_align(g_hint, LV_ALIGN_CENTER, 0, 170);
 
     lv_obj_t *up = lv_label_create(g_face);

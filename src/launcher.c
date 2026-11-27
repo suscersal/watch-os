@@ -215,7 +215,7 @@ static void build_grid(void)
     n += app_manager_in_group(g_group, vis + n, APPS_MAX);
     if (n == 0) {
         lv_obj_t *empty = lv_label_create(launcher);
-        lv_label_set_text(empty, "No apps in ./apps");
+        lv_label_set_text(empty, "Нет приложений в ./apps");
         lv_obj_set_style_text_color(empty, lv_color_white(), 0);
         lv_obj_center(empty);
         return;

@@ -35,8 +35,8 @@ static void refresh_state(void)
     if (!ov) return;
     uint32_t rem = auth_lock_remaining_s();
     if (rem > 0) {
-        char m[64];
-        snprintf(m, sizeof m, "Too many attempts. Try again in %us", (unsigned)rem);
+        char m[128];
+        snprintf(m, sizeof m, "Слишком много попыток. Повторите через %u с", (unsigned)rem);
         pinpad_set_enabled(pad, false);
         pinpad_set_message(pad, m, 0xF59E0B);
         if (!count_timer) count_timer = lv_timer_create(count_cb, 1000, NULL);
@@ -69,8 +69,8 @@ static void pin_cb(const char *pin, void *ud)
         if (auth_lock_remaining_s() > 0) {
             refresh_state();
         } else {
-            char m[48];
-            snprintf(m, sizeof m, "Wrong PIN. Attempts left: %d", auth_attempts_left());
+            char m[96];
+            snprintf(m, sizeof m, "Неверный PIN. Осталось попыток: %d", auth_attempts_left());
             pinpad_set_message(pad, m, 0xEF4444);
         }
         break;
@@ -99,7 +99,7 @@ void lock_screen_lock(void)
 
     pad = pinpad_create(ov, auth_pin_len(), pin_cb, NULL);
     lv_obj_center(pad);
-    pinpad_set_title(pad, "Enter PIN");
+    pinpad_set_title(pad, "Введите PIN");
     refresh_state();   // после перезапуска задержка может ещё действовать
 }
 

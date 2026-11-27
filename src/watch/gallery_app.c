@@ -217,7 +217,7 @@ static void full_timer_cb(lv_timer_t *t)
     full_timer = NULL;                          // таймер с одним повтором LVGL удалит сам
     if (!view_scr || idx < 0 || idx >= n_ids) return;
     imgbuf_t *nb = imgbuf_load(ids[idx], false);
-    if (!nb) { sys_toast("Cannot open photo"); return; }       // остаётся миниатюра
+    if (!nb) { sys_toast("Не удалось открыть фото"); return; }       // остаётся миниатюра
     lv_image_set_src(view_img, &nb->dsc);
     imgbuf_free(view_buf);                      // старый буфер освобождаем после переключения виджета
     view_buf = nb;
@@ -247,8 +247,8 @@ static void delete_confirm_cb(bool ok, void *ud)
     LV_UNUSED(ud);
     if (!ok || !view_scr || idx < 0) return;
     uint32_t id = ids[idx];
-    if (!photos_delete(id)) { sys_toast("Could not delete"); return; }
-    sys_toast("Photo deleted");
+    if (!photos_delete(id)) { sys_toast("Не удалось удалить"); return; }
+    sys_toast("Фото удалено");
     grid_dirty = true;
     int keep = idx;
     n_ids = photos_list(ids, taken, PHOTOS_MAX);
@@ -259,7 +259,7 @@ static void delete_confirm_cb(bool ok, void *ud)
 static void delete_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
-    sys_confirm("Delete photo?", "The photo will be removed from the watch.", delete_confirm_cb, NULL);
+    sys_confirm("Удалить фото?", "Фото будет удалено с часов.", delete_confirm_cb, NULL);
 }
 
 static void ai_cb(lv_event_t *e)
@@ -360,7 +360,7 @@ static void build_grid(void)
         lv_obj_t *l = lv_label_create(grid_body);
         lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(l, lv_pct(100));
-        lv_label_set_text(l, "No photos yet.\nOpen Sync on the watch and send photos from the phone app.");
+        lv_label_set_text(l, "Фото пока нет.\nОткройте «Связь» на часах и отправьте фото из приложения на телефоне.");
         lv_obj_set_style_text_color(l, lv_color_hex(0x9CA3AF), 0);
         return;
     }
@@ -379,7 +379,7 @@ static void build_grid(void)
     if (n_ids > shown) {
         lv_obj_t *l = lv_label_create(grid_body);
         char t[64];
-        snprintf(t, sizeof t, "Showing %d newest of %d", shown, n_ids);
+        snprintf(t, sizeof t, "Показаны %d последних из %d", shown, n_ids);
         lv_label_set_text(l, t);
         lv_obj_set_style_text_color(l, lv_color_hex(0x9CA3AF), 0);
     }
@@ -399,7 +399,7 @@ static void grid_back_cb(lv_event_t *e)
 void gallery_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    grid_scr = sys_screen_create_root("Gallery", grid_back_cb, &grid_body);
+    grid_scr = sys_screen_create_root("Галерея", grid_back_cb, &grid_body);
     lv_obj_add_event_cb(grid_scr, grid_gone_cb, LV_EVENT_DELETE, NULL);
     lv_obj_set_flex_flow(grid_body, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_row(grid_body, 8, 0);

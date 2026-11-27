@@ -24,7 +24,7 @@ static void show_bright(int pct)
 {
     if (!bright_label) return;
     char b[32];
-    snprintf(b, sizeof b, "Brightness: %d%%", pct);
+    snprintf(b, sizeof b, "Яркость: %d%%", pct);
     lv_label_set_text(bright_label, b);
 }
 
@@ -77,7 +77,7 @@ static void add_dropdown(const char *title, const char *options, const int *opts
 void display_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    scr = sys_screen_create_root("Display", back_cb, &body);
+    scr = sys_screen_create_root("Экран", back_cb, &body);
     lv_obj_add_event_cb(scr, deleted_cb, LV_EVENT_DELETE, NULL);
 
     int dim, off, br;
@@ -97,14 +97,14 @@ void display_open(lv_obj_t *launcher)
     lv_obj_add_event_cb(sl, slider_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(sl, slider_release_cb, LV_EVENT_RELEASED, NULL);
 
-    add_dropdown("Dim after", "Never\n15 s\n30 s\n1 min\n5 min", dim_opts, dim);
-    add_dropdown("Screen off after", "Never\n30 s\n1 min\n5 min\n10 min", off_opts, off);
+    add_dropdown("Затемнять через", "Никогда\n15 с\n30 с\n1 мин\n5 мин", dim_opts, dim);
+    add_dropdown("Выключать экран через", "Никогда\n30 с\n1 мин\n5 мин\n10 мин", off_opts, off);
 
     lv_obj_t *row = lv_obj_create(body);                       // «Raise to wake»: экран включается при подъёме руки
     lv_obj_remove_style_all(row);
     lv_obj_set_size(row, lv_pct(100), 44);
     lv_obj_t *rl = lv_label_create(row);
-    lv_label_set_text(rl, "Raise to wake");
+    lv_label_set_text(rl, "Включать при подъёме руки");
     lv_obj_set_style_text_color(rl, lv_color_white(), 0);
     lv_obj_align(rl, LV_ALIGN_LEFT_MID, 0, 0);
     lv_obj_t *sw = lv_switch_create(row);

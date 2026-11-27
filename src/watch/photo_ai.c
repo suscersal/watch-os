@@ -38,10 +38,10 @@ static void send(const char *q)
     if (!g_scr) return;
     size_t n = 0;
     uint8_t *jpg = photos_load(g_id, false, &n);       // полный кадр (до 256 КБ): мелкий текст на миниатюре не прочитать
-    if (!jpg) { lv_label_set_text(g_answer, "Cannot read the photo"); return; }
+    if (!jpg) { lv_label_set_text(g_answer, "Не удалось прочитать фото"); return; }
 
     sys_keyboard_hide();
-    lv_label_set_text(g_answer, "Asking AI...");
+    lv_label_set_text(g_answer, "Спрашиваю ИИ...");
     lv_refr_now(NULL);                                  // запрос блокирующий: сначала рисуем статус
 
     char out[ANSWER_MAX], err[96];
@@ -67,13 +67,13 @@ void photo_ai_open(uint32_t photo_id)
     g_id = photo_id;
     g_prev = lv_screen_active();
     lv_obj_t *body;
-    g_scr = sys_screen_create("Ask AI", back_cb, &body);
+    g_scr = sys_screen_create("Спросить ИИ", back_cb, &body);
     lv_obj_add_event_cb(g_scr, gone_cb, LV_EVENT_DELETE, NULL);
 
     g_ta = lv_textarea_create(body);
     lv_textarea_set_one_line(g_ta, true);
     lv_textarea_set_max_length(g_ta, 200);
-    lv_textarea_set_text(g_ta, "What is in this photo?");
+    lv_textarea_set_text(g_ta, "Что на этом фото?");
     lv_obj_set_width(g_ta, lv_pct(100));
     lv_obj_set_style_bg_color(g_ta, lv_color_hex(WS_CARD), 0);
     lv_obj_set_style_text_color(g_ta, lv_color_white(), 0);
@@ -88,7 +88,7 @@ void photo_ai_open(uint32_t photo_id)
     lv_obj_set_style_shadow_width(b, 0, 0);
     lv_obj_set_style_bg_color(b, lv_color_hex(ws_accent()), 0);
     lv_obj_t *bl = lv_label_create(b);
-    lv_label_set_text(bl, "Send photo");
+    lv_label_set_text(bl, "Отправить фото");
     lv_obj_set_style_text_color(bl, lv_color_white(), 0);
     lv_obj_center(bl);
     lv_obj_add_event_cb(b, send_cb, LV_EVENT_CLICKED, NULL);

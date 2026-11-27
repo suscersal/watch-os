@@ -86,9 +86,9 @@ static void battery_check(void)
     if (!plat_battery(&pct, &chg)) return;
     if (chg || pct > 20) { warned = 0; return; }
     if (g_state == ST_OFF) return;                      // экран выключен: покажем, когда включится
-    char msg[40];
-    if (pct <= 5 && warned < 2)       { warned = 2; snprintf(msg, sizeof msg, "Battery %d%% - charge now", pct); sys_toast(msg); }
-    else if (pct <= 15 && warned < 1) { warned = 1; snprintf(msg, sizeof msg, "Battery low: %d%%", pct); sys_toast(msg); }
+    char msg[96];
+    if (pct <= 5 && warned < 2)       { warned = 2; snprintf(msg, sizeof msg, "Батарея %d%% - зарядите", pct); sys_toast(msg); }
+    else if (pct <= 15 && warned < 1) { warned = 1; snprintf(msg, sizeof msg, "Низкий заряд: %d%%", pct); sys_toast(msg); }
 }
 
 static void tick_cb(lv_timer_t *t)

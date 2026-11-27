@@ -27,8 +27,8 @@ static lv_obj_t *add_label(lv_obj_t *body, const char *text, uint32_t color, con
 static void refresh_pair_btn(void)
 {
     if (!pair_lbl) return;
-    char t[40];
-    snprintf(t, sizeof t, LV_SYMBOL_LIST "  Paired phones (%d)", paired_count());
+    char t[96];
+    snprintf(t, sizeof t, LV_SYMBOL_LIST "  Сопряжённые телефоны (%d)", paired_count());
     lv_label_set_text(pair_lbl, t);
 }
 
@@ -43,26 +43,26 @@ static void loaded_cb(lv_event_t *e) { LV_UNUSED(e); refresh_pair_btn(); }   // 
 static void on_event(sync_event_t ev, void *ud)
 {
     LV_UNUSED(ud);
-    char t[64];
+    char t[128];
     switch (ev) {
-    case SYNC_EV_CONNECTED:     set_status("Phone connected...", 0x9CA3AF); break;
-    case SYNC_EV_AUTH_OK:       set_status("Paired. Waiting for photos", 0x22C55E); break;
-    case SYNC_EV_AUTH_FAIL:     set_status("Wrong code", 0xEF4444); break;
-    case SYNC_EV_TIME_SET:      sys_toast("Time synced"); break;
+    case SYNC_EV_CONNECTED:     set_status("Телефон подключился...", 0x9CA3AF); break;
+    case SYNC_EV_AUTH_OK:       set_status("Связь установлена. Ждём фото", 0x22C55E); break;
+    case SYNC_EV_AUTH_FAIL:     set_status("Неверный код", 0xEF4444); break;
+    case SYNC_EV_TIME_SET:      sys_toast("Время синхронизировано"); break;
     case SYNC_EV_PHOTO:
         got_photos++;
-        snprintf(t, sizeof t, "Photos received: %d", got_photos);
+        snprintf(t, sizeof t, "Получено фото: %d", got_photos);
         set_status(t, 0x22C55E);
         break;
-    case SYNC_EV_AUDIO:         sys_toast("Audio received"); break;
-    case SYNC_EV_FIRMWARE:      set_status("Firmware installed. Restarting...", 0x22C55E); sys_toast("Firmware installed"); break;
-    case SYNC_EV_PAIRED:        sys_toast("Phone paired"); refresh_pair_btn(); break;
-    case SYNC_EV_PHOTO_DELETED: sys_toast("Photo removed by phone"); break;
+    case SYNC_EV_AUDIO:         sys_toast("Аудио получено"); break;
+    case SYNC_EV_FIRMWARE:      set_status("Прошивка установлена. Перезапуск...", 0x22C55E); sys_toast("Прошивка установлена"); break;
+    case SYNC_EV_PAIRED:        sys_toast("Телефон сопряжён"); refresh_pair_btn(); break;
+    case SYNC_EV_PHOTO_DELETED: sys_toast("Фото удалено телефоном"); break;
     case SYNC_EV_MESSAGE:       break;     // уведомление уже лежит в messages; на экране синхронизации ничего не меняем
     case SYNC_EV_DISCONNECTED:
         if (sync_net_running()) {
-            if (sync_net_last_drop()[0]) { snprintf(t, sizeof t, "Dropped: %s", sync_net_last_drop()); set_status(t, 0xF59E0B); }
-            else set_status(got_photos ? "Done. Waiting for phone" : "Waiting for phone", 0x9CA3AF);
+            if (sync_net_last_drop()[0]) { snprintf(t, sizeof t, "Обрыв: %s", sync_net_last_drop()); set_status(t, 0xF59E0B); }
+            else set_status(got_photos ? "Готово. Ждём телефон" : "Ждём телефон", 0x9CA3AF);
         }
         break;
     }
@@ -99,10 +99,10 @@ void sync_app_open(lv_obj_t *launcher)
     g_launcher = launcher;
     got_photos = 0;
     lv_obj_t *body;
-    scr = sys_screen_create_root("Sync", back_cb, &body);
+    scr = sys_screen_create_root("Связь", back_cb, &body);
     lv_obj_add_event_cb(scr, gone_cb, LV_EVENT_DELETE, NULL);
 
-    add_label(body, "First time: enter this address and code in the phone app. After that the phone connects by itself.", 0x9CA3AF, NULL);
+    add_label(body, "В первый раз введите этот адрес и код в приложении на телефоне. Дальше телефон подключается сам.", 0x9CA3AF, NULL);
 
     lv_obj_t *pb = lv_button_create(body);
     lv_obj_set_size(pb, lv_pct(100), 48);
@@ -116,22 +116,22 @@ void sync_app_open(lv_obj_t *launcher)
     refresh_pair_btn();
 
     if (!sync_net_start(0)) {
-        add_label(body, "Cannot open the sync port.", 0xEF4444, NULL);
+        add_label(body, "Не удалось открыть порт синхронизации.", 0xEF4444, NULL);
         status_lbl = NULL;
     } else {
         char ip[40], line[64];
-        if (!plat_local_ip(ip, sizeof ip)) snprintf(ip, sizeof ip, "no network");
+        if (!plat_local_ip(ip, sizeof ip)) snprintf(ip, sizeof ip, "нет сети");
         snprintf(line, sizeof line, "%s : %u", ip, (unsigned)sync_net_port());
-        add_label(body, "Address", 0x9CA3AF, WATCH_FONT_SMALL);
+        add_label(body, "Адрес", 0x9CA3AF, WATCH_FONT_SMALL);
         add_label(body, line, 0xFFFFFF, WATCH_FONT_LARGE);
 
         const char *c = sync_net_code();
         char code[16];
         snprintf(code, sizeof code, "%c%c%c %c%c%c", c[0], c[1], c[2], c[3], c[4], c[5]);
-        add_label(body, "Code", 0x9CA3AF, WATCH_FONT_SMALL);
+        add_label(body, "Код", 0x9CA3AF, WATCH_FONT_SMALL);
         add_label(body, code, 0x38BDF8, WATCH_FONT_LARGE);
 
-        if (strcmp(ip, "no network") != 0) {          // QR: телефон открывает ссылку и подставляет адрес и код
+        if (strcmp(ip, "нет сети") != 0) {          // QR: телефон открывает ссылку и подставляет адрес и код
             char url[128];
             pairing_url(url, sizeof url, ip, sync_net_port(), c, false);
             lv_obj_t *wrap = lv_obj_create(body);
@@ -142,7 +142,7 @@ void sync_app_open(lv_obj_t *launcher)
             pairing_qr_create(wrap, url, 200);
         }
 
-        status_lbl = add_label(body, "Waiting for phone", 0x9CA3AF, NULL);
+        status_lbl = add_label(body, "Ждём телефон", 0x9CA3AF, NULL);
         sync_rx_set_event_cb(on_event, NULL);
     }
     lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);   // лаунчер не удаляем

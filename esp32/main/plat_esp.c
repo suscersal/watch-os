@@ -183,3 +183,28 @@ bool plat_sd_present(void)
 }
 
 const char *plat_sd_root(void) { return plat_sd_present() ? BSP_SD_MOUNT_POINT : NULL; }
+
+// ---------- сведения о системе («О часах») ----------
+#include "esp_heap_caps.h"
+#include "esp_littlefs.h"
+#include "esp_ota_ops.h"
+
+void plat_sysinfo(plat_sysinfo_t *o)
+{
+    memset(o, 0, sizeof *o);
+    o->platform = "ESP32-S3";
+    esp_app_desc_t d;
+    if (esp_ota_get_partition_description(esp_ota_get_running_partition(), &d) == ESP_OK) {
+        snprintf(o->version, sizeof o->version, "%.31s", d.version);
+        snprintf(o->built, sizeof o->built, "%.12s %.8s", d.date, d.time);
+    }
+    o->heap_free    = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    o->heap_total   = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    o->psram_free   = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    o->psram_total  = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+    size_t total = 0, used = 0;
+    if (esp_littlefs_info("storage", &total, &used) == ESP_OK) {
+        o->store_total = total;
+        o->store_free  = total > used ? total - used : 0;
+    }
+}

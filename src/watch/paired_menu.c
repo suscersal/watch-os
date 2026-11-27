@@ -36,7 +36,7 @@ static void deleted_cb(lv_event_t *e) { LV_UNUSED(e); g_body = NULL; }
 static void forget_cb(lv_event_t *e)
 {
     int idx = (int)(intptr_t)lv_event_get_user_data(e);
-    if (paired_remove(idx)) sys_toast("Phone forgotten");
+    if (paired_remove(idx)) sys_toast("Телефон забыт");
     sync_net_notify_apply();
     lv_async_call(rebuild_async, NULL);      // перестроить после выхода из обработчика кнопки
 }
@@ -47,14 +47,14 @@ static void forget_all_done(bool ok, void *ud)
     if (!ok) return;
     paired_clear();
     sync_net_notify_apply();
-    sys_toast("All phones forgotten");
+    sys_toast("Все телефоны забыты");
     lv_async_call(rebuild_async, NULL);
 }
 
 static void forget_all_cb(lv_event_t *e)
 {
     LV_UNUSED(e);
-    sys_confirm("Forget all?", "Every phone will need the code from Sync again.", forget_all_done, NULL);
+    sys_confirm("Забыть все?", "Каждому телефону снова понадобится код из «Связи».", forget_all_done, NULL);
 }
 
 static void rebuild(void)
@@ -63,15 +63,15 @@ static void rebuild(void)
     lv_obj_clean(g_body);
     int n = paired_count();
     if (n == 0) {
-        add_label("No paired phones. Open Sync and enter the code in the phone app once; after that the phone connects by itself.", 0x9CA3AF, WATCH_FONT_SMALL);
+        add_label("Нет сопряжённых телефонов. Откройте «Связь» и один раз введите код в приложении на телефоне, дальше телефон подключается сам.", 0x9CA3AF, WATCH_FONT_SMALL);
         return;
     }
-    add_label("A phone on this list connects without a code: it sends its saved token.", 0x9CA3AF, WATCH_FONT_SMALL);
+    add_label("Телефон из этого списка подключается без кода: он отправляет сохранённый токен.", 0x9CA3AF, WATCH_FONT_SMALL);
     for (int i = 0; i < n; i++) {
-        char name[PAIRED_NAME_MAX + 1], id[16], idl[24];
+        char name[PAIRED_NAME_MAX + 1], id[16], idl[32];
         if (!paired_info(i, name, sizeof name)) break;
         if (!paired_id(i, id, sizeof id)) id[0] = '\0';
-        snprintf(idl, sizeof idl, "token %s", id);
+        snprintf(idl, sizeof idl, "токен %s", id);
         lv_obj_t *row = lv_obj_create(g_body);
         lv_obj_remove_style_all(row);
         lv_obj_set_size(row, lv_pct(100), 58);
@@ -93,7 +93,7 @@ static void rebuild(void)
         lv_obj_set_style_bg_color(b, lv_color_hex(0xEF4444), 0);
         lv_obj_align(b, LV_ALIGN_RIGHT_MID, 0, 0);
         lv_obj_t *bl = lv_label_create(b);
-        lv_label_set_text(bl, LV_SYMBOL_TRASH "  Forget");
+        lv_label_set_text(bl, LV_SYMBOL_TRASH "  Забыть");
         lv_obj_center(bl);
         lv_obj_add_event_cb(b, forget_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
     }
@@ -104,7 +104,7 @@ static void rebuild(void)
         lv_obj_set_style_shadow_width(b, 0, 0);
         lv_obj_set_style_bg_color(b, lv_color_hex(0x6B7280), 0);
         lv_obj_t *bl = lv_label_create(b);
-        lv_label_set_text(bl, "Forget all");
+        lv_label_set_text(bl, "Забыть все");
         lv_obj_center(bl);
         lv_obj_add_event_cb(b, forget_all_cb, LV_EVENT_CLICKED, NULL);
     }
@@ -113,7 +113,7 @@ static void rebuild(void)
 void paired_menu_open(lv_obj_t *from)
 {
     g_from = from;
-    lv_obj_t *scr = sys_screen_create("Paired phones", back_cb, &g_body);
+    lv_obj_t *scr = sys_screen_create("Сопряжённые телефоны", back_cb, &g_body);
     lv_obj_add_event_cb(scr, deleted_cb, LV_EVENT_DELETE, NULL);
     rebuild();
     lv_screen_load_anim(scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);   // родитель не удаляем

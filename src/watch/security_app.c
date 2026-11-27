@@ -43,7 +43,7 @@ static void flow_back_cb(lv_event_t *e) { LV_UNUSED(e); flow_finish(); }
 static void set_stage(stage_t st)
 {
     g_stage = st;
-    pinpad_set_title(flow_pad, st == ST_CURRENT ? "Current PIN" : st == ST_NEW ? "New PIN" : "Repeat PIN");
+    pinpad_set_title(flow_pad, st == ST_CURRENT ? "Текущий PIN" : st == ST_NEW ? "Новый PIN" : "Повторите PIN");
     pinpad_clear(flow_pad);
 }
 
@@ -53,15 +53,15 @@ static void flow_pin_cb(const char *pin, void *ud)
     if (g_stage == ST_CURRENT) {
         auth_result_t r = auth_verify(pin);
         if (r == AUTH_OK) {
-            if (g_mode == MODE_REMOVE) { auth_remove_pin(); sys_toast("PIN removed"); flow_finish(); }
+            if (g_mode == MODE_REMOVE) { auth_remove_pin(); sys_toast("PIN удалён"); flow_finish(); }
             else { pinpad_set_message(flow_pad, "", 0xFFFFFF); set_stage(ST_NEW); }
         } else if (auth_lock_remaining_s() > 0) {
-            char m[64];
-            snprintf(m, sizeof m, "Too many attempts. Wait %us", (unsigned)auth_lock_remaining_s());
+            char m[128];
+            snprintf(m, sizeof m, "Слишком много попыток. Подождите %u с", (unsigned)auth_lock_remaining_s());
             pinpad_set_message(flow_pad, m, 0xF59E0B);
         } else {
-            char m[48];
-            snprintf(m, sizeof m, "Wrong PIN. Attempts left: %d", auth_attempts_left());
+            char m[96];
+            snprintf(m, sizeof m, "Неверный PIN. Осталось попыток: %d", auth_attempts_left());
             pinpad_set_message(flow_pad, m, 0xEF4444);
         }
     } else if (g_stage == ST_NEW) {
@@ -70,10 +70,10 @@ static void flow_pin_cb(const char *pin, void *ud)
         set_stage(ST_REPEAT);
     } else {
         if (strcmp(pin, new_pin) == 0 && auth_set_pin(pin)) {
-            sys_toast("PIN saved");
+            sys_toast("PIN сохранён");
             flow_finish();
         } else {
-            pinpad_set_message(flow_pad, "PINs do not match", 0xEF4444);
+            pinpad_set_message(flow_pad, "PIN не совпадают", 0xEF4444);
             set_stage(ST_NEW);
         }
     }
@@ -83,7 +83,7 @@ static void start_flow(mode_t_ mode)
 {
     g_mode = mode;
     lv_obj_t *body;
-    lv_obj_t *scr = sys_screen_create(mode == MODE_SET ? "Set PIN" : mode == MODE_CHANGE ? "Change PIN" : "Remove PIN",
+    lv_obj_t *scr = sys_screen_create(mode == MODE_SET ? "Задать PIN" : mode == MODE_CHANGE ? "Сменить PIN" : "Удалить PIN",
                                       flow_back_cb, &body);
     flow_pad = pinpad_create(body, 0, flow_pin_cb, NULL);
     set_stage(mode == MODE_SET ? ST_NEW : ST_CURRENT);
@@ -121,20 +121,20 @@ static void refresh_main(void)
     lv_obj_clean(main_body);
 
     lv_obj_t *st = lv_label_create(main_body);
-    lv_label_set_text(st, auth_has_pin() ? "PIN is set" : "PIN is not set");
+    lv_label_set_text(st, auth_has_pin() ? "PIN задан" : "PIN не задан");
     lv_obj_set_style_text_color(st, lv_color_hex(auth_has_pin() ? 0x22C55E : 0x9CA3AF), 0);
 
-    add_button(auth_has_pin() ? "Change PIN" : "Set PIN", WS_BLUE, set_cb);
+    add_button(auth_has_pin() ? "Сменить PIN" : "Задать PIN", WS_BLUE, set_cb);
     if (auth_has_pin()) {
-        add_button("Lock now", 0x6B7280, lock_cb);
-        add_button("Remove PIN", 0xEF4444, remove_cb);
+        add_button("Заблокировать", 0x6B7280, lock_cb);
+        add_button("Удалить PIN", 0xEF4444, remove_cb);
 
         lv_obj_t *h = lv_label_create(main_body);
-        lv_label_set_text(h, "Auto-lock after");
+        lv_label_set_text(h, "Автоблокировка через");
         lv_obj_set_style_text_color(h, lv_color_hex(0x9CA3AF), 0);
         lv_obj_t *dd = lv_dropdown_create(main_body);
         lv_obj_set_width(dd, lv_pct(100));
-        lv_dropdown_set_options(dd, "15 s\n30 s\n1 min\n5 min\nNever");
+        lv_dropdown_set_options(dd, "15 с\n30 с\n1 мин\n5 мин\nНикогда");
         uint32_t sel = 1;
         for (uint32_t i = 0; i < sizeof timeouts / sizeof timeouts[0]; i++) if (timeouts[i] == auth_timeout_s()) sel = i;
         lv_dropdown_set_selected(dd, sel);
@@ -145,7 +145,7 @@ static void refresh_main(void)
 void security_open(lv_obj_t *launcher)
 {
     g_launcher = launcher;
-    main_scr = sys_screen_create_root("Security", main_back_cb, &main_body);
+    main_scr = sys_screen_create_root("Защита", main_back_cb, &main_body);
     lv_obj_add_event_cb(main_scr, main_deleted_cb, LV_EVENT_DELETE, NULL);
     refresh_main();
     lv_screen_load_anim(main_scr, LV_SCREEN_LOAD_ANIM_MOVE_LEFT, 200, 0, false);     // лаунчер не удаляем

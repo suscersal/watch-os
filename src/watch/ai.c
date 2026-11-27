@@ -46,7 +46,7 @@ static char *phone_post(const char *body, size_t max_answer, int timeout_s, char
     }
     if (status != 200) {
         char msg[96];
-        copy_trim(msg, sizeof msg, ans[0] ? ans : "Phone app error", false);
+        copy_trim(msg, sizeof msg, ans[0] ? ans : "Ошибка приложения на телефоне", false);
         snprintf(err, errn, "%s", msg);
         free(ans);
         return NULL;
@@ -78,7 +78,7 @@ bool ai_ask_image(const char *question, const uint8_t *jpeg, size_t n, char *out
 {
     if (outn) out[0] = '\0';
     if (!jpeg || n == 0) { snprintf(err, errn, "No photo"); return false; }
-    const char *q = (question && *question) ? question : "What is in this photo?";
+    const char *q = (question && *question) ? question : "Что на этом фото?";
 
     // JSON собираем вручную: base64 фото занимает сотни КБ, копировать его через cJSON незачем.
     cJSON *qs = cJSON_CreateString(q);

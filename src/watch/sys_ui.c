@@ -332,7 +332,7 @@ void sys_confirm(const char *title, const char *msg, sys_confirm_cb cb, void *ud
         lv_obj_set_style_shadow_width(b, 0, 0);
         lv_obj_set_style_bg_color(b, lv_color_hex(yes ? ws_accent() : WS_FILL), 0);
         lv_obj_t *l = lv_label_create(b);
-        lv_label_set_text(l, yes ? "OK" : "Cancel");
+        lv_label_set_text(l, yes ? "ОК" : "Отмена");
         lv_obj_center(l);
         lv_obj_add_event_cb(b, dlg_btn_cb, LV_EVENT_CLICKED, yes ? (void *)1 : NULL);
     }

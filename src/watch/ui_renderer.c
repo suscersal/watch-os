@@ -386,7 +386,7 @@ static void add_children(bctx_t *c, lv_obj_t *parent, const cJSON *arr, int dept
     const cJSON *n;
     cJSON_ArrayForEach(n, arr) {
         if (c->count >= MAX_WIDGETS) {
-            if (!c->over) { c->over = true; sys_toast("Too many widgets"); }
+            if (!c->over) { c->over = true; sys_toast("Слишком много элементов"); }
             return;
         }
         add_widget(c, parent, n, depth, in_row);

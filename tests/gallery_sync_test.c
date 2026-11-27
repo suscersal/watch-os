@@ -413,11 +413,11 @@ int main(int argc, char **argv)
     gallery_viewer_step(+1); run(300);
 
     press(lv_screen_active(), LV_SYMBOL_TRASH);
-    CHECK(find_label(lv_layer_top(), "Delete photo?") != NULL, "delete asks for confirmation");
-    press(lv_layer_top(), "Cancel");
+    CHECK(find_label(lv_layer_top(), "Удалить фото?") != NULL, "delete asks for confirmation");
+    press(lv_layer_top(), "Отмена");
     CHECK(photos_count() == 2, "cancel keeps the photo");
     press(lv_screen_active(), LV_SYMBOL_TRASH);
-    press(lv_layer_top(), "OK"); run(300);
+    press(lv_layer_top(), "ОК"); run(300);
     CHECK(photos_count() == 1 && !exists("data/photos/6553f100_000000a1.jpg") && !exists("data/photos/6553f100_000000a1.t.jpg"), "photo A deleted with its thumbnail");
     CHECK(gallery_viewer_index() == 0 && find_label(lv_screen_active(), "1 / 1") != NULL && is_color(205, 251, 255, 255, 0), "viewer moved to the remaining photo");
     press(lv_screen_active(), LV_SYMBOL_LEFT); run(400);
@@ -473,7 +473,7 @@ int main(int argc, char **argv)
     CHECK(sync_net_running(), "Sync screen starts the server");
     { char c3[16]; const char *c = sync_net_code(); snprintf(c3, sizeof c3, "%c%c%c %c%c%c", c[0], c[1], c[2], c[3], c[4], c[5]);
       CHECK(find_label(lv_screen_active(), c3) != NULL, "pairing code shown as 'NNN NNN'");
-      CHECK(find_label(lv_screen_active(), "Waiting for phone") != NULL, "status: waiting for phone"); }
+      CHECK(find_label(lv_screen_active(), "Ждём телефон") != NULL, "status: waiting for phone"); }
     sys_screen_exit(lv_screen_active()); run(400);   // главный экран приложения: выход как свайпом
     CHECK(!sync_net_running(), "leaving Sync screen stops the server");
 
