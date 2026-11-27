@@ -55,3 +55,29 @@ void pm_esp_start(void)
     ESP_LOGI("pm", "энергосбережение процессора выключено в конфигурации");
 #endif
 }
+
+void pm_esp_screen_off(bool off)
+{
+#if CONFIG_PM_ENABLE && CONFIG_WATCH_POWER_SAVE && CONFIG_WATCH_SCREEN_OFF_SLEEP
+    static bool cur;
+    if (off == cur) return;
+    cur = off;
+    int max = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+    if (off && max > 160) max = 160;
+    bool sleep = CONFIG_WATCH_LIGHT_SLEEP ? true : false;
+#if CONFIG_FREERTOS_USE_TICKLESS_IDLE
+    if (off) sleep = true;
+#endif
+    esp_pm_config_t c = { .max_freq_mhz = max, .min_freq_mhz = CONFIG_WATCH_CPU_MIN_MHZ, .light_sleep_enable = sleep };
+    esp_err_t e = esp_pm_configure(&c);
+    ESP_LOGI("pm", "экран %s: DFS %d..%d МГц, light sleep %s: %s", off ? "выкл" : "вкл", c.min_freq_mhz, c.max_freq_mhz,
+             sleep ? "on" : "off", esp_err_to_name(e));
+    // Касание опрашивается таймером LVGL: при выключенном экране реже, чтобы процессор мог спать.
+    for (lv_indev_t *i = lv_indev_get_next(NULL); i; i = lv_indev_get_next(i)) {
+        lv_timer_t *t = lv_indev_get_read_timer(i);
+        if (t) lv_timer_set_period(t, off ? 100 : 33);
+    }
+#else
+    (void)off;
+#endif
+}

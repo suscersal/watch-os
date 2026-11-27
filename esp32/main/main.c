@@ -52,9 +52,11 @@ static void set_brightness(int pct)
         if (s_wake_tmr) esp_timer_stop(s_wake_tmr);
         bsp_display_brightness_set(0);
         if (s_panel_on) { bsp_display_panel_power(false); s_panel_on = false; }
+        pm_esp_screen_off(true);
         return;
     }
     if (!s_panel_on) {                          // выходим из выключенного состояния: включим после перерисовки
+        pm_esp_screen_off(false);
         if (s_wake_tmr && !esp_timer_is_active(s_wake_tmr)) esp_timer_start_once(s_wake_tmr, 180 * 1000);
         return;
     }
