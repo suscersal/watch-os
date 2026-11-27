@@ -634,7 +634,14 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config, esp_lcd_panel_hand
                                                                  config->max_transfer_sz);
     ESP_ERROR_CHECK(spi_bus_initialize(BSP_LCD_SPI_NUM, &buscfg, SPI_DMA_CH_AUTO));
 
-    const esp_lcd_panel_io_spi_config_t io_config = SH8601_PANEL_IO_QSPI_CONFIG(BSP_LCD_CS, NULL, NULL);
+    esp_lcd_panel_io_spi_config_t io_config = SH8601_PANEL_IO_QSPI_CONFIG(BSP_LCD_CS, NULL, NULL);
+    if (config->psram_buf) {
+        // Буфер кадра в PSRAM. Драйвер SPI на ESP32-S3 не берёт данные из PSRAM по DMA: каждый поставленный в очередь кусок
+        // он копирует во внутреннюю DMA-память (размером с кусок). При очереди 10 и кусках по 32 КБ это 320 КБ внутренней
+        // RAM, её нет -> "spi transmit (queue) color failed", кадр не доходит до панели и экран остаётся чёрным.
+        // Очередь из 2 коротких кусков держит во внутренней RAM не больше ~16 КБ.
+        io_config.trans_queue_depth = 2;
+    }
 
     sh8601_vendor_config_t vendor_config = {
         .init_cmds = lcd_init_cmds,
@@ -695,11 +702,18 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
     return esp_lcd_touch_new_i2c_ft5x06(tp_io_handle, &tp_cfg, ret_touch);
 }
 
+#define BSP_LCD_PSRAM_CHUNK 8192   // байт за одну SPI-передачу, когда буфер кадра в PSRAM
+
 static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
 {
     const uint32_t buffer_size = cfg->buffer_size ? cfg->buffer_size : BSP_LCD_DRAW_BUFF_SIZE;
+    uint32_t max_transfer_sz = buffer_size * BSP_LCD_BITS_PER_PIXEL / 8;
+    if (cfg->flags.buff_spiram && max_transfer_sz > BSP_LCD_PSRAM_CHUNK) {
+        max_transfer_sz = BSP_LCD_PSRAM_CHUNK;   // кадр уходит на экран кусками (IDF режет передачу по этому размеру)
+    }
     const bsp_display_config_t disp_config = {
-        .max_transfer_sz = buffer_size * BSP_LCD_BITS_PER_PIXEL / 8,
+        .max_transfer_sz = max_transfer_sz,
+        .psram_buf = cfg->flags.buff_spiram,
     };
 
     BSP_ERROR_CHECK_RETURN_NULL(bsp_display_new(&disp_config, &panel_handle, &io_handle));

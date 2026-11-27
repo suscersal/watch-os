@@ -1,6 +1,7 @@
 
 
 #pragma once
+#include <stdbool.h>
 #include "esp_lcd_types.h"
 
 /* LCD color formats */
@@ -29,6 +30,7 @@ extern "C" {
  */
 typedef struct {
     int max_transfer_sz;    /*!< Maximum transfer size, in bytes. */
+    bool psram_buf;         /*!< Буфер отрисовки лежит в PSRAM: SPI-драйвер на ESP32-S3 читает его не напрямую, а через внутренний DMA-буфер. */
 } bsp_display_config_t;
 
 /**
