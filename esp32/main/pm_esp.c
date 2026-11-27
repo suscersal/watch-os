@@ -64,7 +64,11 @@ void pm_esp_screen_off(bool off)
     cur = off;
     int max = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
     if (off && max > 160) max = 160;
-    bool sleep = CONFIG_WATCH_LIGHT_SLEEP ? true : false;
+#if CONFIG_WATCH_LIGHT_SLEEP
+    bool sleep = true;
+#else
+    bool sleep = false;
+#endif
 #if CONFIG_FREERTOS_USE_TICKLESS_IDLE
     if (off) sleep = true;
 #endif
