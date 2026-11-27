@@ -207,58 +207,66 @@ class EspFlasher(private val port: FlashPort, private val log: (String) -> Unit 
         for (i in 4 until 36) d[i] = 0x55
         for (i in 0 until 8) {
             try {
-                command(OP_SYNC, d, 0, 200)
-                while (readFrame(100) != null) { /* ROM отвечает на SYNC несколько раз: вычитываем хвост */ }
-                return true
-            } catch (_: FlashException) {
+                    command(OP_SYNC, d, 0, 200)
+                    while (readFrame(100) != null) { /* ROM отвечает на SYNC несколько раз: вычитываем хвост */ }
+                    return true
+                } catch (_: FlashException) {
+                }
             }
+            return false
         }
-        return false
-    }
 
-    fun connect() {
-        var ok = false
-        for (attempt in 1..6) {
-            log("Resetting the watch into download mode ($attempt/6)")
-            resetToBootloader()
-            rpos = 0; rlen = 0; cur.reset(); inFrame = false; esc = false
-            if (trySync()) { ok = true; break }
-        }
-        if (!ok) throw FlashException(tr("The watch does not answer. Hold the BOOT button while plugging the USB cable, then try again.", "Часы не отвечают. Зажмите кнопку BOOT при подключении USB-кабеля и повторите."))
-        try {
-            val magic = command(OP_READ_REG, le32(0x40001000)).value
-            log("Chip id 0x%x%s".format(magic, if (magic == 9) " (ESP32-S3)" else " (unexpected)"))
-        } catch (e: FlashException) {
-            log("Chip id not read: ${e.message}")
-        }
-        command(OP_SPI_ATTACH, ByteArray(8))
-        command(OP_SPI_SET_PARAMS, le32(0, FlashPlan.FLASH_SIZE, 0x10000, 0x1000, 0x100, 0xFFFF))
-    }
-
-    private fun hex(b: ByteArray): String = b.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
-
-    /** Пишет области, проверяет MD5 каждой, затем перезагружает часы. progress: 0..100. */
-    fun write(regions: List<FlashRegion>, progress: (Int) -> Unit = {}) {
-        val comps = regions.map { deflate(it.data) }
-        val total = maxOf(1, comps.sumOf { (it.size + BLOCK - 1) / BLOCK })
-        var done = 0
-        for ((i, r) in regions.withIndex()) {
-            val c = comps[i]
-            val blocks = (c.size + BLOCK - 1) / BLOCK
-            log("Writing 0x%x, %d KB (erasing first)".format(r.offset, r.data.size / 1024))
-            command(OP_DEFL_BEGIN, le32(r.data.size, blocks, BLOCK, r.offset, 0), 0,
-                maxOf(3000L, 30000L * r.data.size / 1000000L).toInt())
-            for (seq in 0 until blocks) {
-                val blk = c.copyOfRange(seq * BLOCK, minOf(c.size, (seq + 1) * BLOCK))
-                command(OP_DEFL_DATA, le32(blk.size, seq, 0, 0) + blk, checksum(blk), 5000)
-                done++
-                progress(done * 100 / total)
+        fun connect() {
+            var ok = false
+            for (attempt in 1..6) {
+                log("Resetting the watch into download mode ($attempt/6)")
+                resetToBootloader()
+                rpos = 0; rlen = 0; cur.reset(); inFrame = false; esc = false
+                if (trySync()) { ok = true; break }
             }
-            val md5 = command(OP_MD5, le32(r.offset, r.data.size, 0, 0), 0,
-                maxOf(3000L, 8000L * r.data.size / 1000000L).toInt()).data
-            val got = if (md5.size >= 32) String(md5, 0, 32, Charsets.US_ASCII).lowercase() else hex(md5.copyOf(minOf(16, md5.size)))
-            val want = hex(MessageDigest.getInstance("MD5").digest(r.data))
-            if (got != want) throw FlashException("check failed at 0x%x: the flash holds different data than was written".format(r.offset))
+            if (!ok) throw FlashException(tr("The watch does not answer. Hold the BOOT button while plugging the USB cable, then try again.", "Часы не отвечают. Зажмите кнопку BOOT при подключении USB-кабеля и повторите."))
+            try {
+                val magic = command(OP_READ_REG, le32(0x40001000)).value
+                log("Chip id 0x%x%s".format(magic, if (magic == 9) " (ESP32-S3)" else " (unexpected)"))
+            } catch (e: FlashException) {
+                log("Chip id not read: ${e.message}")
+            }
+            command(OP_SPI_ATTACH, ByteArray(8))
+            command(OP_SPI_SET_PARAMS, le32(0, FlashPlan.FLASH_SIZE, 0x10000, 0x1000, 0x100, 0xFFFF))
+        }
+
+        private fun hex(b: ByteArray): String = b.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+
+        /** Пишет области, проверяет MD5 каждой, затем перезагружает часы. progress: 0..100. */
+        fun write(regions: List<FlashRegion>, progress: (Int) -> Unit = {}) {
+            val comps = regions.map { deflate(it.data) }
+            val total = maxOf(1, comps.sumOf { (it.size + BLOCK - 1) / BLOCK })
+            var done = 0
+            // Загрузчик и таблица разделов (адрес 0) пишем последними: если запись оборвётся на приложении,
+            // старый загрузчик и старая таблица останутся, и часы продолжат загружаться.
+            val order = regions.indices.sortedBy { if (regions[it].offset == 0) 1 else 0 }
+            for (i in order) {
+                val r = regions[i]
+                val c = comps[i]
+                try {
+                val blocks = (c.size + BLOCK - 1) / BLOCK
+                log("Writing 0x%x, %d KB (erasing first)".format(r.offset, r.data.size / 1024))
+                command(OP_DEFL_BEGIN, le32(r.data.size, blocks, BLOCK, r.offset, 0), 0,
+                    maxOf(3000L, 30000L * r.data.size / 1000000L).toInt())
+                for (seq in 0 until blocks) {
+                    val blk = c.copyOfRange(seq * BLOCK, minOf(c.size, (seq + 1) * BLOCK))
+                    command(OP_DEFL_DATA, le32(blk.size, seq, 0, 0) + blk, checksum(blk), 5000)
+                    done++
+                    progress(done * 100 / total)
+                }
+                val md5 = command(OP_MD5, le32(r.offset, r.data.size, 0, 0), 0,
+                    maxOf(3000L, 8000L * r.data.size / 1000000L).toInt()).data
+                val got = if (md5.size >= 32) String(md5, 0, 32, Charsets.US_ASCII).lowercase() else hex(md5.copyOf(minOf(16, md5.size)))
+                val want = hex(MessageDigest.getInstance("MD5").digest(r.data))
+                if (got != want) throw FlashException("check failed at 0x%x: the flash holds different data than was written".format(r.offset))
+            } catch (e: FlashException) {
+                throw FlashException((e.message ?: "flash error") + " [0x%x, %d KB]".format(r.offset, r.data.size / 1024))
+            }
         }
         try {
             command(OP_DEFL_END, le32(1), 0, 3000)
