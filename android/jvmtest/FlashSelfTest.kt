@@ -46,11 +46,13 @@ class FakeRom(val flash: ByteArray, val corrupt: Boolean = false) : FlashPort {
     }
 
     private fun reply(op: Int, value: Int, data: ByteArray, err: Int = 0) {
-        val p = ByteArray(8 + data.size + 2)
-        p[0] = 1; p[1] = op.toByte(); p[2] = (data.size + 2).toByte(); p[3] = ((data.size + 2) shr 8).toByte()
+        // Как настоящий ROM ESP32-S3: после данных идут 2 байта статуса и 2 зарезервированных, в которых бывает мусор.
+        val p = ByteArray(8 + data.size + 4)
+        p[0] = 1; p[1] = op.toByte(); p[2] = (data.size + 4).toByte(); p[3] = ((data.size + 4) shr 8).toByte()
         System.arraycopy(EspFlasher.le32(value), 0, p, 4, 4)
         System.arraycopy(data, 0, p, 8, data.size)
         p[8 + data.size] = if (err != 0) 1 else 0; p[9 + data.size] = err.toByte()
+        p[10 + data.size] = 0x63; p[11 + data.size] = 0x66
         for (b in EspFlasher.slip(p)) out.addLast(b)
     }
 

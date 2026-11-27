@@ -168,7 +168,10 @@ class EspFlasher(private val port: FlashPort, private val log: (String) -> Unit 
 
     private class Resp(val value: Int, val data: ByteArray)
 
-    private fun command(op: Int, data: ByteArray, chk: Int = 0, timeoutMs: Int = 3000): Resp {
+    // Ответ ROM: [данные команды][статус, код ошибки][ещё 2 зарезервированных байта - там бывает мусор].
+    // Статус стоит сразу ПОСЛЕ данных команды (как в esptool), а не в конце кадра.
+    // respLen: длина данных команды; -1 = MD5 (32 символа в ROM, 16 байт в stub).
+    private fun command(op: Int, data: ByteArray, chk: Int = 0, timeoutMs: Int = 3000, respLen: Int = 0): Resp {
         val pkt = ByteArray(8 + data.size)
         pkt[0] = 0
         pkt[1] = op.toByte()
@@ -185,9 +188,10 @@ class EspFlasher(private val port: FlashPort, private val log: (String) -> Unit 
             if (f.size < 10 || f[0].toInt() != 1 || (f[1].toInt() and 0xFF) != op) continue
             val value = (f[4].toInt() and 0xFF) or ((f[5].toInt() and 0xFF) shl 8) or ((f[6].toInt() and 0xFF) shl 16) or ((f[7].toInt() and 0xFF) shl 24)
             val body = f.copyOfRange(8, f.size)
-            val st = body.size - 2
-            if (body[st].toInt() != 0) throw FlashException("command 0x%02x failed (error 0x%02x)".format(op, body[st + 1].toInt() and 0xFF))
-            return Resp(value, body.copyOfRange(0, st))
+            val rl = if (respLen < 0) (if (body.size >= 34) 32 else 16) else respLen
+            if (body.size < rl + 2) throw FlashException("short reply to command 0x%02x".format(op))
+            if (body[rl].toInt() != 0) throw FlashException("command 0x%02x failed (error 0x%02x)".format(op, body[rl + 1].toInt() and 0xFF))
+            return Resp(value, body.copyOfRange(0, rl))
         }
     }
 
@@ -260,7 +264,7 @@ class EspFlasher(private val port: FlashPort, private val log: (String) -> Unit 
                     progress(done * 100 / total)
                 }
                 val md5 = command(OP_MD5, le32(r.offset, r.data.size, 0, 0), 0,
-                    maxOf(3000L, 8000L * r.data.size / 1000000L).toInt()).data
+                    maxOf(3000L, 8000L * r.data.size / 1000000L).toInt(), -1).data
                 val got = if (md5.size >= 32) String(md5, 0, 32, Charsets.US_ASCII).lowercase() else hex(md5.copyOf(minOf(16, md5.size)))
                 val want = hex(MessageDigest.getInstance("MD5").digest(r.data))
                 if (got != want) throw FlashException("check failed at 0x%x: the flash holds different data than was written".format(r.offset))
