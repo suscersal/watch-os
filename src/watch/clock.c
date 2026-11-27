@@ -49,6 +49,14 @@ void clock_set(int64_t epoch_s, int tz_offset_min)
     plat_rtc_write(epoch_s);
 }
 
+void clock_set_utc(int64_t epoch_s)
+{
+    g_base_epoch = epoch_s;
+    g_base_tick = lv_tick_get();
+    g_set = true;
+    plat_rtc_write(epoch_s);
+}
+
 void clock_set_tz(bool is_auto, int tz_offset_min)
 {
     settings_set_tz(is_auto, tz_offset_min);

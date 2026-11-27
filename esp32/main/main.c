@@ -17,6 +17,7 @@
 #include "imu_esp.h"
 #include "pm_esp.h"
 #include "ota_esp.h"
+#include "ntp_esp.h"
 #include "watch/clock.h"
 #include "watch/power.h"
 #include "watch/settings.h"
@@ -155,4 +156,5 @@ void app_main(void)
         watchface_show(lv_screen_active());              // после включения - циферблат
         bsp_display_unlock();
     }
+    ntp_esp_start();                    // после clock_init: сверка времени по сети, как только есть IP
 }

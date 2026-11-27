@@ -75,4 +75,25 @@ menu "watch-os"
             Раз в 5 секунд печатает время отрисовки и оценку WATCH_EMU_US_PER_PX для эмулятора
             (см. esp32/README.md, "Калибровка эмулятора"). Для обычной работы выключите.
 
+    config WATCH_NTP
+        bool "Автоматическая синхронизация времени по сети (SNTP)"
+        default y
+        help
+            Когда часы получают IP по Wi-Fi, они спрашивают точное время у NTP-сервера, ставят его и пишут в RTC
+            (оно переживает перезагрузку). Дальше сверка раз в WATCH_NTP_INTERVAL_MIN минут. Поправка меньше 2 секунд
+            не применяется. Пояс остаётся прежним (от телефона или из Settings): SNTP даёт только UTC.
+
+    config WATCH_NTP_SERVER
+        string "NTP-сервер"
+        depends on WATCH_NTP
+        default "pool.ntp.org"
+        help
+            Запасные серверы: time.google.com и time.cloudflare.com.
+
+    config WATCH_NTP_INTERVAL_MIN
+        int "Период сверки времени, минут"
+        depends on WATCH_NTP
+        default 60
+        range 5 1440
+
 endmenu

@@ -9,6 +9,7 @@
 void clock_init(void);
 
 void clock_set(int64_t epoch_s, int tz_offset_min);   // epoch в UTC и смещение пояса в минутах (Москва +180); пишет в RTC
+void clock_set_utc(int64_t epoch_s);                   // только UTC (из SNTP): пояс и настройки не трогает; пишет в RTC
 bool clock_is_set(void);
 bool clock_local(struct tm *out);                      // местное время; false, если время ещё не задано
 bool clock_utc(int64_t *epoch_s);
