@@ -579,6 +579,13 @@ esp_err_t bsp_display_backlight_on(void)
     ESP_LOGI(TAG, "Backlight on");
     return bsp_display_brightness_set(100);
 }
+
+// Включить/выключить саму панель (DISPON/DISPOFF). Содержимое GRAM сохраняется.
+esp_err_t bsp_display_panel_power(bool on)
+{
+    if (panel_handle == NULL) return ESP_ERR_INVALID_STATE;
+    return esp_lcd_panel_disp_on_off(panel_handle, on);
+}
 #if LVGL_VERSION_MAJOR >= 9
 static void rounder_event_cb(lv_event_t *e)
 {

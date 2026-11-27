@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "nvs_flash.h"
+#include "esp_timer.h"
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
@@ -23,7 +24,42 @@
 
 void watch_launcher_create(void);   // src/launcher.c
 
-static void set_brightness(int pct) { bsp_display_brightness_set(pct); }
+esp_err_t bsp_display_panel_power(bool on);   // добавлено в BSP (esp32_s3_touch_amoled_2_06.c)
+
+// Экран «выключен»: яркость 0 и DISPOFF (панель не светит и потребляет меньше). Включение откладываем на ~180 мс:
+// пока LVGL перерисовывает кадр порциями по 20 строк, панель остаётся тёмной, и полос от перерисовки не видно.
+static bool s_panel_on = true;
+static volatile int s_want_pct;
+static esp_timer_handle_t s_wake_tmr;
+
+static void wake_cb(void *arg)
+{
+    (void)arg;
+    if (!bsp_display_lock(200)) return;
+    if (!s_panel_on) { bsp_display_panel_power(true); s_panel_on = true; }
+    bsp_display_brightness_set(s_want_pct);
+    bsp_display_unlock();
+}
+
+static void set_brightness(int pct)
+{
+    if (!s_wake_tmr) {
+        const esp_timer_create_args_t a = { .callback = wake_cb, .name = "wake" };
+        esp_timer_create(&a, &s_wake_tmr);
+    }
+    s_want_pct = pct;
+    if (pct <= 0) {
+        if (s_wake_tmr) esp_timer_stop(s_wake_tmr);
+        bsp_display_brightness_set(0);
+        if (s_panel_on) { bsp_display_panel_power(false); s_panel_on = false; }
+        return;
+    }
+    if (!s_panel_on) {                          // выходим из выключенного состояния: включим после перерисовки
+        if (s_wake_tmr && !esp_timer_is_active(s_wake_tmr)) esp_timer_start_once(s_wake_tmr, 180 * 1000);
+        return;
+    }
+    bsp_display_brightness_set(pct);
+}
 
 static const char *TAG = "watch";
 
