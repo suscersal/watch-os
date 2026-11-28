@@ -6,6 +6,7 @@
 #include <stddef.h>
 
 void settings_init(const char *data_root);
+const char *settings_data_root(void);   // папка данных, переданная в settings_init (до вызова - "data")
 
 // Часовой пояс: auto - берём пояс, который прислал телефон; иначе фиксированное смещение в минутах.
 // tz_min - последнее известное смещение (пояс телефона или выбранный вручную).

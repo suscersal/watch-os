@@ -33,6 +33,8 @@ bool plat_local_ip(char *buf, size_t n)
 
 bool plat_rtc_read(int64_t *epoch_utc)
 {
+    const char *off = getenv("WATCH_RTC");           // WATCH_RTC=off: имитация RTC без питания (проверка сохранённого времени)
+    if (off && strcmp(off, "off") == 0) return false;
     time_t t = time(NULL);
     if (t < 1500000000) return false;
     *epoch_utc = (int64_t)t;

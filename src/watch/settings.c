@@ -46,8 +46,12 @@ static bool code_ok(const char *c)
     return true;
 }
 
+static char g_root[64] = "data";
+const char *settings_data_root(void) { return g_root; }
+
 void settings_init(const char *data_root)
 {
+    snprintf(g_root, sizeof g_root, "%s", data_root);
     snprintf(g_path, sizeof g_path, "%s/settings.json", data_root);
     memset(&S, 0, sizeof S);
     S.tz_auto = true;
