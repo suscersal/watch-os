@@ -9,6 +9,8 @@
 #include "music_app.h"
 #include "recorder_app.h"
 #include "timer_app.h"
+#include "stopwatch_app.h"
+#include "alarm_app.h"
 #include "calc_app.h"
 #include "security_app.h"
 #include "about_app.h"
@@ -155,6 +157,8 @@ static void register_system_apps(void)
 
     reg_folder(GRP_TOOLS, "Инструменты", 0xFF9F0A);
     reg_app("sys_timer",    "Таймер",      "timer",   0xFF8800, GRP_TOOLS, timer_open);
+    reg_app("sys_stopwatch","Секундомер",  "timer",   0xFFD60A, GRP_TOOLS, stopwatch_open);
+    reg_app("sys_alarm",    "Будильник",   "bell",    0xFF453A, GRP_TOOLS, alarm_open);
     reg_app("sys_calc",     "Калькулятор", "calc",    0xFF9F0A, GRP_TOOLS, calc_open);
     reg_app("sys_recorder", "Диктофон",    "mic",     0xFF3B30, GRP_TOOLS, recorder_open);
 

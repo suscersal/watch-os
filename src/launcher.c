@@ -13,6 +13,7 @@
 #include "watch/ws_style.h"
 #include "watch/music_app.h"
 #include "watch/recorder_app.h"
+#include "watch/alarm_app.h"
 #include "watch/auth.h"
 #include "watch/battery_app.h"
 #include "watch/paired.h"
@@ -160,6 +161,7 @@ void watch_launcher_create(void)
     music_init(WATCH_ROOT "data");           // музыка: data/music/*.wav
     printf("LTRACE 7 ok: music_init\n");
     recorder_init(WATCH_ROOT "data");        // записи: data/rec
+    alarm_init(WATCH_ROOT "data");           // будильники: data/alarms.json, фоновая проверка раз в секунду
     printf("LTRACE 8 ok: recorder_init\n");
     photos_init(WATCH_ROOT "data/photos");   // фото с телефона (Gallery)
     printf("LTRACE 9 ok: photos_init\n");
